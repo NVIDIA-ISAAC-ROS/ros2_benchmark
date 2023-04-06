@@ -97,7 +97,7 @@ To use and learn to use `ros2_benchmark`, start by running a sample benchmark. F
     launch_test src/ros2_benchmark/scripts/apriltag_ros_apriltag_node_test.py
     ```
 
-8. Once the benchmark is finished, the final performance measurements are displayed in the terminal.  
+8. Once the benchmark is finished, the final performance measurements are displayed in the terminal.
 
    Additionally, the final results and benchmark metadata (e.g., system information, benchmark configurations) are also exported as a JSON file.
 
@@ -105,7 +105,7 @@ To use and learn to use `ros2_benchmark`, start by running a sample benchmark. F
 
 Input data for benchmarking is provided in a rosbag.
 
-To provide consistency of results, we have provided multiple dataset sequences in rosbag for use with `ros2_benchmark`. These dataset sequences were captured on a robot, using very high precision time synchronization between sensors.  Captured sensor data includes [HAWK (2mp RGB stereo camera with IMU)](https://www.leopardimaging.com/li-ar0234cs-stereo-gmsl2-hawk/), [D455](https://www.intelrealsense.com/depth-camera-d455/) and [XT32](https://www.hesaitech.com/product/xt32/).  
+To provide consistency of results, we have provided multiple dataset sequences in rosbag for use with `ros2_benchmark`. These dataset sequences were captured on a robot, using very high precision time synchronization between sensors.  Captured sensor data includes [HAWK (2mp RGB stereo camera with IMU)](https://www.leopardimaging.com/li-ar0234cs-stereo-gmsl2-hawk/), [D455](https://www.intelrealsense.com/depth-camera-d455/) and [XT32](https://www.hesaitech.com/product/xt32/).
 
 These datasets are explicitly **not** provided inside this repository. Instead, visit NGC to download the dataset [here](https://registry.ngc.nvidia.com/orgs/nvidia/teams/isaac/resources/r2bdataset2023).
 
@@ -142,9 +142,9 @@ mv r2bdataset2023_v1 assets/datasets/r2b_dataset
 
 Performance measurements are output to a results JSON file. JSON provides a human-readable format which allows for traceable independently verifiable results and can be conveniently imported into your visualization tool of choice.
 
-Default measurements include throughput, latency, and jitter.  These measurements can be performed for the sample rate from the dataset sequence of the rosbag input, at peak throughput, and for fixed frequencies often to represent a sensor capture rate; for example 10hz for LIDAR or 30fps for camera.  
+Default measurements include throughput, latency, and jitter.  These measurements can be performed for the sample rate from the dataset sequence of the rosbag input, at peak throughput, and for fixed frequencies often to represent a sensor capture rate; for example 10hz for LIDAR or 30fps for camera.
 
-Included in the log is information on the host system on which results were measured, when they were measured, and the corresponding software version. The input data used, and a hash of the input data file is reported for traceability of results.  The input YAML configuration used for the benchmark run is reported allowing results to be independent reproduced with the same configuration.  
+Included in the log is information on the host system on which results were measured, when they were measured, and the corresponding software version. The input data used, and a hash of the input data file is reported for traceability of results.  The input YAML configuration used for the benchmark run is reported allowing results to be independent reproduced with the same configuration.
 
 > **Note**: We use the naming convention `_node` to represent a graph under test that contains a single node (for example, `stereo_image_proc_node.py`) and `_graph` to represent a graph of multiple nodes (for example, `stereo_image_proc_graph.py`).
 
@@ -156,8 +156,8 @@ The following are the performance results measured with `ros2_benchmark` on `aar
 | -------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | [AprilTag Node](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/scripts/apriltag_ros_apriltag_node.py)                                | 720p       | [82.9 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/apriltag_ros_apriltag_node-x86_64_rtx_3060Ti.json)<br>14 ms        | [56.3 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/apriltag_ros_apriltag_node-agx_orin.json)<br>18 ms        |
 | [Rectify Node](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/scripts/image_proc_rectify_node.py)                                    | 1080p      | [189 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/image_proc_rectify_node-x86_64_rtx_3060Ti.json)<br>5.0 ms           | [182 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/image_proc_rectify_node-agx_orin.json)<br>5.8 ms           |
-| [H.264 Encoder Node<br>I-frame Support](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/scripts/image_transport_h264_decoder_node.py) | 1080p      | [56.2 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/image_transport_h264_decoder_node-x86_64_rtx_3060Ti.json)<br>32 ms | [28.0 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/image_transport_h264_decoder_node-agx_orin.json)<br>37 ms |
-| [H.264 Encoder Node<br>P-frame Support](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/scripts/image_transport_h264_encoder_node.py) | 1080p      | [42.8 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/image_transport_h264_encoder_node-x86_64_rtx_3060Ti.json)<br>33 ms | [10.2 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/image_transport_h264_encoder_node-agx_orin.json)<br>95 ms |
+| [H.264 Decoder Node](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/scripts/image_transport_h264_decoder_node.py) | 1080p      | [56.2 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/image_transport_h264_decoder_node-x86_64_rtx_3060Ti.json)<br>32 ms | [28.0 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/image_transport_h264_decoder_node-agx_orin.json)<br>37 ms |
+| [H.264 Encoder Node<br>I-frame Support](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/scripts/image_transport_h264_encoder_node.py) | 1080p      | [42.8 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/image_transport_h264_encoder_node-x86_64_rtx_3060Ti.json)<br>33 ms | [10.2 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/image_transport_h264_encoder_node-agx_orin.json)<br>95 ms |
 | [Stereo Disparity Node](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/scripts/stereo_image_proc_node.py)                            | 1080p      | [99.5 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/stereo_image_proc_node-x86_64_rtx_3060Ti.json)<br>10 ms            | [68.3 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/stereo_image_proc_node-agx_orin.json)<br>14 ms            |
 
 | Graph                                                                                                                     | Input Size | Intel NUC Corei7 11th Gen                                                                                                                    | AGX Orin (CPU only)                                                                                                                 |
