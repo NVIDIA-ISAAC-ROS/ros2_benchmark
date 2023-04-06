@@ -118,7 +118,7 @@ wget --content-disposition https://ngc.nvidia.com/downloads/ngccli_linux.zip && 
 With the NGC CLI available, you can download the dataset with the following commands:
 
 ```bash
-./ngc-cli/ngc registry resource download-version "nvidia/isaac/r2bdataset2023:1"
+./ngc-cli/ngc registry resource download-version "nvidia/isaac/r2bdataset2023:v1"
 ```
 
 Then, move the datasets to their required location:
