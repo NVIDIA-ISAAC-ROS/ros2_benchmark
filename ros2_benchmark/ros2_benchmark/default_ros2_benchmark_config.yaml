@@ -1,0 +1,141 @@
+%YAML 1.2
+# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+# Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+---
+ros2_benchmark_config:
+    # Version number of this default config file
+    default_config_version: "0.30.0"
+
+    # Namespace of the benchmark test
+    benchmark_namespace: "r2b"
+
+    # Benchmark name to be used in performance output messages
+    benchmark_name: ""
+
+    # Custom information to be included in the final report file
+    custom_report_info: {}
+
+    # Benchmark mode for how buffered messages should be played.
+    # Can be either of "TIMELINE", "LOOPING" or "SWEEPING".
+    benchmark_mode: "LOOPING"
+
+    # Use timestamp's sec field in a message header as message IDs for benchmarking
+    revise_timestamps_as_message_ids: false
+
+    # Enable CPU profiling during benchmarking
+    enable_cpu_profiler: true
+
+    # Enable publishing TF messages when setting data in a data loader node
+    publish_tf_messages_in_set_data: false
+    publish_tf_static_messages_in_set_data: false
+
+    # Request a data loader node to publish messages in real-time
+    load_data_in_real_time: false
+
+    # Request a playback node to record/buffer messages along with their arrival
+    # timestamps and use them as the message timeline
+    record_data_timeline: false
+
+    # Add an additional trial buffer preparation call before the formal buffer
+    # preparation process
+    enable_trial_buffer_preparation: false
+
+    # The interval for probing CPU utilization
+    cpu_profiling_interval_sec: 1
+
+    # Monitor node configurations
+    monitor_info_list:
+      - service_name: "start_monitoring0"
+        calculators:
+          - module_name: "ros2_benchmark.basic_performance_calculator"
+            class_name: "BasicPerformanceCalculator"
+            config:
+              report_prefix: ""
+
+    # Duration, in seconds, for how long each benchmark should run
+    benchmark_duration: 5
+
+    # Amount of time to wait for a service client to be created
+    setup_service_client_timeout_sec: 20
+
+    # Amount of time for a service to complete before timing out
+    start_recording_service_timeout_sec: 30
+    start_monitoring_service_timeout_sec: 10
+
+    # Amount of time to wait for a service future to return
+    default_service_future_timeout_sec: 15
+    set_data_service_future_timeout_sec: 60
+    start_recording_service_future_timeout_sec: 35
+    play_messages_service_future_timeout_sec: 15
+
+    # The number of test iterations
+    test_iterations: 5
+
+    # The number of frames to be buffered
+    playback_message_buffer_size: 100
+
+    # Upper and lower bounds of peak throughput search window
+    publisher_upper_frequency: 100.0
+    publisher_lower_frequency: 10.0
+
+    # Whether to stop testing when the desired playback publisher rate cannot be met
+    enforce_publisher_rate: false
+
+    # A list of fixed test publisher rate to be tested after the main fps benchmark test
+    additional_fixed_publisher_rate_tests: [10.0, 30.0, 60.0]
+
+    # Stop binary search once upper and lower target frequencies are within this range
+    binary_search_terminal_interval_width: 10  # (hz)
+
+    # Multiplier for the test duration during throughput binary search probe
+    binary_search_duration_fraction: 1.0
+
+    # Fraction of frames that can be lost without failing the test
+    binary_search_acceptable_frame_loss_fraction: 0.05
+
+    # Frame rate drop between input and output that can be tolerated without failing the test
+    binary_search_acceptable_frame_rate_drop: 10  # (hz)
+
+    # Frequency, in hz, to increase the target frequency by with each step
+    linear_scan_step_size: 5
+
+    # Multiplier for the test duration during throughput linear search probe
+    linear_scan_duration_fraction: 1.0
+
+    # Fraction of frames that can be lost without failing the test
+    linear_scan_acceptable_frame_loss_fraction: 0.01
+
+    # Frame rate drop between input and output that can be tolerated without failing the test
+    linear_scan_acceptable_frame_rate_drop: 5  # (hz)
+
+    # The path of the directory for exporting benchmark final report
+    log_folder: "/tmp"
+
+    # The name of the file for exporting benchmark final report in the "log_folder".
+    # The file name is automatically generated if not set.
+    log_file_name: ""
+
+    # The directory for storing assets
+    assets_root: "/workspaces/isaac_ros-dev/ros_ws/src/ros2_benchmark/assets"
+
+    # The path, relative to "assets_root", of the file (usually a rosbag) to be
+    # loaded by a data loader node
+    input_data_path: ""
+
+    # The time range (in seconds) in the data to be loaded from a data loader node
+    input_data_start_time: -1
+    input_data_end_time: -1

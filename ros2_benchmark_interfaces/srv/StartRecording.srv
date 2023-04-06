@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
+# Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+
+# This service is used to request a playback node to start recording
+# incoming messages.
+
+# The number of messages to be buffered for each topic.
+# All incoming messages will be buffered if set to 0.
+uint64 buffer_length
+
+# The maximum time, in seconds, to wait for all expected number of
+# messages to be buffereed
+int64 timeout
+
+# An array that holds the message playback timeline for each topic.
+# It must be provided if the timeline playback mode is to be used.
+TopicMessageTimestampArray[] topic_message_timestamps
+
+# Enable recording message arrival timestamps and overriding
+# topic_message_timestamps
+bool record_data_timeline false
+
+---
+
+# Whether or not all expected messages were received successfully
+bool success false
+
+# The total number of messages being recorded
+uint64 recorded_message_count
+
+# The number of messages recorded for each topic
+TopicMessageCount[] recorded_topic_message_counts
