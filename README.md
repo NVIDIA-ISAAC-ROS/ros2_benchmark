@@ -124,7 +124,7 @@ With the NGC CLI available, you can download the dataset with the following comm
 Then, move the datasets to their required location:
 
 ```bash
-mv r2bdataset2023_v1 assets/datasets/r2b_dataset
+mv r2bdataset2023_vv1 assets/datasets/r2b_dataset
 ```
 
 | Sequence                                                                                           | Size | Visual                                                                                     | Contents                                                                                                                                                                       | Description                                                                                                                                                                                        |
