@@ -56,50 +56,78 @@ This package is designed and tested to be compatible aarch64 and x86_64 platform
 
 ## Quickstart
 
-To use and learn to use `ros2_benchmark`, start by running a sample benchmark. Follow the steps below to start measuring performance of an AprilTag node with `ros2_benchmark`.
+To use and learn to use `ros2_benchmark`, start by running a sample benchmark. Follow the steps below to start measuring the performance of an AprilTag node with `ros2_benchmark`.
 
-1. Set up your development environment by following the instructions [here](https://github.com/NVIDIA-ISAAC-ROS/isaac_ros_common/blob/main/docs/dev-env-setup.md).
-
-2. Clone this repository and an available implementation of Apriltag detection under `~/workspaces/isaac_ros-dev/src`.
+1. Install ROS 2 Humble natively (see [here](https://docs.ros.org/en/humble/Installation.html)) or launch official Docker container with ROS 2 Humble pre-installed:
 
     ```bash
-    cd ~/workspaces/isaac_ros-dev/src && \
-        git clone https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark && \
-        git clone https://github.com/christianrauch/apriltag_ros.git
+    docker run -it ros:humble
     ```
 
-3. Pull down the `r2b dataset 2023` by following the instructions [here](#datasets).
-
-4. Launch a development Docker container for convenience using the `run_dev.sh` script:
-
+2. Setup convenience environment variables and install tools.
     ```bash
-    cd ~/workspaces/isaac_ros-dev/src/isaac_ros_common && \
-      ./scripts/run_dev.sh
+    export R2B_WS_HOME=~/ros_ws && \
+    export ROS2_BENCHMARK_OVERRIDE_ASSETS_ROOT=$R2B_WS_HOME/src/ros2_benchmark/assets && \
+    sudo apt-get update && sudo apt-get install -y git wget
     ```
 
-5. Inside the container, build `ros2_benchmark` and source the workspace:
+3. Clone this repository along with an available implementation of Apriltag detection and install dependencies.
 
     ```bash
-    cd /workspaces/isaac_ros-dev && \
-      colcon build --symlink-install --packages-up-to ros2_benchmark apriltag_ros && \
+    mkdir -p $R2B_WS_HOME/src && cd $R2B_WS_HOME/src && \
+        git clone https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark.git && \
+        git clone https://github.com/christianrauch/apriltag_ros.git && \
+    cd $R2B_WS_HOME && \
+        sudo apt-get update && \
+        rosdep install -i -r --from-paths src --rosdistro humble -y
+    ```
+
+4. Clone, patch, and build `image_proc` package with required, backported fix for image resize (see [here](https://github.com/ros-perception/image_pipeline/pull/786)).
+
+    ```bash
+    cd $R2B_WS_HOME/src && \
+      git clone https://github.com/ros-perception/vision_opencv.git && cd vision_opencv && git checkout humble && \
+    cd $R2B_WS_HOME/src && \
+      git clone https://github.com/ros-perception/image_pipeline.git && cd image_pipeline && git checkout humble && \
+      git config user.email "benchmarking@ros2_benchmark.com" && git config user.name "ROS 2 Developer" && \
+      git remote add fork https://github.com/schornakj/image_pipeline.git && git fetch fork && git cherry-pick fork/pr-backport-693 && \
+    cd $R2B_WS_HOME && \
+      sudo apt-get update && \
+      rosdep install -i -r --from-paths src --rosdistro humble -y && \
+      colcon build --packages-up-to image_proc
+    ```
+
+5. Pull down `r2b dataset 2023` by following the instructions [here](#datasets) or fetch just the rosbag used in this Quickstart with the following command.
+
+    ```bash
+    mkdir -p $R2B_WS_HOME/src/ros2_benchmark/assets/datasets/r2b_dataset/r2b_storage && \
+    cd $R2B_WS_HOME/src/ros2_benchmark/assets/datasets/r2b_dataset/r2b_storage && \
+      wget --content-disposition 'https://api.ngc.nvidia.com/v2/resources/nvidia/isaac/r2bdataset2023/versions/1/files/r2b_storage/metadata.yaml' && \
+      wget --content-disposition 'https://api.ngc.nvidia.com/v2/resources/nvidia/isaac/r2bdataset2023/versions/1/files/r2b_storage/r2b_storage_0.db3'
+    ```
+
+6. Build `ros2_benchmark` and source the workspace:
+
+    ```bash
+    cd $R2B_WS_HOME && \
+      colcon build --packages-up-to ros2_benchmark apriltag_ros && \
       source install/setup.bash
     ```
 
-6. (Optional) Run tests to verify complete and correct installation:
+7. (Optional) Run tests to verify complete and correct installation:
 
     ```bash
     colcon test --packages-select ros2_benchmark
     ```
 
-7. Start the AprilTag benchmark:
+8. Start the AprilTag benchmark:
 
     ```bash
-    launch_test src/ros2_benchmark/scripts/apriltag_ros_apriltag_node_test.py
+    launch_test src/ros2_benchmark/scripts/apriltag_ros_apriltag_node.py
     ```
 
-8. Once the benchmark is finished, the final performance measurements are displayed in the terminal.
-
-   Additionally, the final results and benchmark metadata (e.g., system information, benchmark configurations) are also exported as a JSON file.
+Once the benchmark is finished, the final performance measurements are displayed in the terminal.
+Additionally, the final results and benchmark metadata (e.g., system information, benchmark configurations) are also exported as a JSON file.
 
 ## Datasets
 
