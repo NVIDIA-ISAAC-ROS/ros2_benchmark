@@ -133,7 +133,7 @@ Additionally, the final results and benchmark metadata (e.g., system information
 
 Input data for benchmarking is provided in a rosbag.
 
-To provide consistency of results, we have provided multiple dataset sequences in rosbag for use with `ros2_benchmark`. These dataset sequences were captured on a robot, using very high precision time synchronization between sensors.  Captured sensor data includes [HAWK (2mp RGB stereo camera with IMU)](https://www.leopardimaging.com/li-ar0234cs-stereo-gmsl2-hawk/), [D455](https://www.intelrealsense.com/depth-camera-d455/) and [XT32](https://www.hesaitech.com/product/xt32/).
+To provide consistency of results, we have provided multiple dataset sequences in rosbag for use with `ros2_benchmark`; input data in other rosbag(s) can be used. These dataset sequences were captured on a robot, using very high precision time synchronization between sensors.  Captured sensor data includes [HAWK (2mp RGB stereo camera with IMU)](https://www.leopardimaging.com/li-ar0234cs-stereo-gmsl2-hawk/), [D455](https://www.intelrealsense.com/depth-camera-d455/) and [XT32](https://www.hesaitech.com/product/xt32/).
 
 These datasets are explicitly **not** provided inside this repository. Instead, visit NGC to download the dataset [here](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/isaac/resources/r2bdataset2023).
 
