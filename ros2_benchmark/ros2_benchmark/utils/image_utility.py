@@ -17,7 +17,7 @@
 
 
 class Resolution:
-    """Generic resolution vaule holder."""
+    """Generic resolution value holder."""
 
     def __init__(self, width, height, name=''):
         """Initialize the resolution."""
