@@ -2,8 +2,8 @@
 Changelog for package ros2_benchmark
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.30.1 (2023-05-16)
+-------------------
 * Merge pull request #8 from NVIDIA-ISAAC-ROS/jaiveers/hotfix-release-dp3-2
   Update r2b download instructions
 * Update r2b download instructions
