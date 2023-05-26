@@ -70,8 +70,8 @@ class NsysUtility():
         """Invoke the launch_setup method with nsys parameters for ComposableNodeContainer."""
         enable_nsys, container_prefix = NsysUtility.generate_nsys_prefix(context)
         launch_setup_parameters = signature(launch_setup).parameters
-        if (not all([param in launch_setup_parameters for param in
-                     ['container_prefix', 'container_sigterm_timeout']])):
+        if (not all(param in launch_setup_parameters for param in
+                    ['container_prefix', 'container_sigterm_timeout'])):
             if enable_nsys:
                 raise RuntimeError(
                     'Incorrect launch_setup signature. '

@@ -198,7 +198,7 @@ class BasicPerformanceCalculator():
         final_perf_data = {}
         for metric in BasicPerformanceMetrics:
             metric_value_list = [perf_data.get(metric, None) for perf_data in self._perf_data_list]
-            if not all([isinstance(value, numbers.Number) for value in metric_value_list]):
+            if not all(isinstance(value, numbers.Number) for value in metric_value_list):
                 continue
 
             # Remove the best and the worst before concluding the metric

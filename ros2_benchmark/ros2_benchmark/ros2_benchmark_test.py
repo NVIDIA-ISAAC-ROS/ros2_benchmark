@@ -24,6 +24,7 @@ from math import ceil
 import os
 import platform
 import sys
+import time
 from typing import Iterable
 import unittest
 
@@ -48,6 +49,7 @@ from .utils.ros2_utility import ClientUtility
 
 # The maximum allowed line width of a performance repeort displayed in the terminal
 MAX_REPORT_OUTPUT_WIDTH = 90
+idle_cpu_util = 0.0
 
 
 class BenchmarkMetadata(Enum):
@@ -66,6 +68,7 @@ class BenchmarkMetadata(Enum):
     INPUT_DATA_START_TIME = 'Input Data Start Time (s)'
     INPUT_DATA_END_TIME = 'Input Data End Time (s)'
     DATA_RESOLUTION = 'Data Resolution'
+    IDLE_CPU_UTIL = 'Idle System CPU Util. (%)'
     PEAK_THROUGHPUT_PREDICTION = 'Peak Throughput Prediction (Hz)'
     CONFIG = 'Test Configurations'
 
@@ -172,6 +175,13 @@ class ROS2BenchmarkTest(unittest.TestCase):
             The LaunchDescription object to launch before running the test
 
         """
+        # Wait until the system CPU usage become stable
+        rclpy.logging.get_logger('r2b').info(
+            'Waiting 10 seconds for measuring idle system CPU utilization...')
+        time.sleep(10)
+        global idle_cpu_util
+        idle_cpu_util = CPUProfiler.get_current_cpu_usage()
+
         return launch.LaunchDescription(
             nodes + [
                 # Start tests after a fixed delay for node startup
@@ -185,6 +195,13 @@ class ROS2BenchmarkTest(unittest.TestCase):
         launch_setup, node_startup_delay: float = 5.0
     ) -> launch.LaunchDescription:
         """Generate a test launch description with the nsys capability built in."""
+        # Wait until the system CPU usage become stable
+        rclpy.logging.get_logger('r2b').info(
+            'Waiting 10 seconds for measuring idle system CPU utilization...')
+        time.sleep(10)
+        global idle_cpu_util
+        idle_cpu_util = CPUProfiler.get_current_cpu_usage()
+
         launch_args = NsysUtility.generate_launch_args()
         bound_launch_setup = partial(
             NsysUtility.launch_setup_wrapper,
@@ -337,6 +354,7 @@ class ROS2BenchmarkTest(unittest.TestCase):
         metadata[BenchmarkMetadata.DEVICE_OS] = \
             f'{uname.system} {uname.release} {uname.version}'
         metadata[BenchmarkMetadata.CONFIG] = self.config.to_yaml_str()
+        metadata[BenchmarkMetadata.IDLE_CPU_UTIL] = idle_cpu_util
 
         # Benchmark data info
         metadata[BenchmarkMetadata.BENCHMARK_MODE] = self.config.benchmark_mode.value
