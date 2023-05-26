@@ -75,6 +75,7 @@ class ROS2BenchmarkConfig():
         'publish_tf_static_messages_in_set_data': bool,
         'load_data_in_real_time': bool,
         'record_data_timeline': bool,
+        'enable_trial_buffer_preparation': bool,
         'cpu_profiling_interval_sec': float,
         'benchmark_duration': float,
         'setup_service_client_timeout_sec': float,

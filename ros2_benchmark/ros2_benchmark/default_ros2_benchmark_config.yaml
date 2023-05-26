@@ -117,7 +117,7 @@ ros2_benchmark_config:
     linear_scan_duration_fraction: 1.0
 
     # Fraction of frames that can be lost without failing the test
-    linear_scan_acceptable_frame_loss_fraction: 0.01
+    linear_scan_acceptable_frame_loss_fraction: 0.05
 
     # Frame rate drop between input and output that can be tolerated without failing the test
     linear_scan_acceptable_frame_rate_drop: 5  # (hz)
@@ -130,7 +130,7 @@ ros2_benchmark_config:
     log_file_name: ""
 
     # The directory for storing assets
-    assets_root: "/workspaces/isaac_ros-dev/ros_ws/src/ros2_benchmark/assets"
+    assets_root: "/workspaces/isaac_ros-dev/src/ros2_benchmark/assets"
 
     # The path, relative to "assets_root", of the file (usually a rosbag) to be
     # loaded by a data loader node

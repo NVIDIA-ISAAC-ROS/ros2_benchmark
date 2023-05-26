@@ -2,6 +2,12 @@
 Changelog for package ros2_benchmark
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.31.0 (2023-05-25)
+-------------------
+* Isaac ROS 0.31.0 (DP3.1)
+* Contributors: Jaiveer Singh
+
+
 0.30.1 (2023-05-16)
 -------------------
 * Merge pull request #8 from NVIDIA-ISAAC-ROS/jaiveers/hotfix-release-dp3-2

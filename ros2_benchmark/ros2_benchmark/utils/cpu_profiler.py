@@ -76,6 +76,11 @@ class CPUProfiler(Profiler):
             # Wait for thread to stop
             self.psutil_thread.join()
 
+    @staticmethod
+    def get_current_cpu_usage():
+        """Return current CPU usage."""
+        return np.mean(psutil.cpu_percent(interval=1.0, percpu=True))
+
     def get_results(self, log_file_path=None) -> dict:
         """Return CPU profiling results."""
         assert not self._is_running, 'Cannot collect results until profiler has been stopped!'
@@ -129,7 +134,7 @@ class CPUProfiler(Profiler):
         for metric in CPUProfilingMetrics:
             metric_value_list = [profile_data.get(metric, None) for
                                  profile_data in self._profile_data_list]
-            if not all([isinstance(value, numbers.Number) for value in metric_value_list]):
+            if not all(isinstance(value, numbers.Number) for value in metric_value_list):
                 continue
 
             # Remove the best and the worst before concluding the metric
