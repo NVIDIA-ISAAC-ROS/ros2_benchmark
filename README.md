@@ -82,7 +82,7 @@ To use and learn to use `ros2_benchmark`, start by running a sample benchmark. F
         rosdep install -i -r --from-paths src --rosdistro humble -y
     ```
 
-4. Clone, patch, and build `image_proc` package with required, backported fix for image resize (see [here](https://github.com/ros-perception/image_pipeline/pull/786)).
+4. Clone, and build `image_proc` package.
 
     ```bash
     cd $R2B_WS_HOME/src && \
@@ -90,7 +90,6 @@ To use and learn to use `ros2_benchmark`, start by running a sample benchmark. F
     cd $R2B_WS_HOME/src && \
       git clone https://github.com/ros-perception/image_pipeline.git && cd image_pipeline && git checkout humble && \
       git config user.email "benchmarking@ros2_benchmark.com" && git config user.name "ROS 2 Developer" && \
-      git remote add fork https://github.com/schornakj/image_pipeline.git && git fetch fork && git cherry-pick fork/pr-backport-693 && \
     cd $R2B_WS_HOME && \
       sudo apt-get update && \
       rosdep install -i -r --from-paths src --rosdistro humble -y && \
