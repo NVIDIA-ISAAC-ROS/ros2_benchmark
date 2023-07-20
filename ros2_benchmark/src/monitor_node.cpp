@@ -48,9 +48,30 @@ MonitorNode::MonitorNode(const rclcpp::NodeOptions & options)
     get_logger(),
     "[MonitorNode] Starting a monitor node with a service name \"%s\"",
     monitor_service_name_.c_str());
+}
 
-  // Create a monitor subscriber
-  CreateGenericTypeMonitorSubscriber();
+rclcpp::QoS MonitorNode::ResolveTopicQoS(std::string topic_name,
+                                        int num_attempts,
+                                        int attempt_sleep_ms)
+{
+  std::optional<rclcpp::QoS> qos_opt;
+
+  for (int i = 0; i < num_attempts; i++) {
+    qos_opt = getTopicQos(this, topic_name);
+    if (qos_opt.has_value()) break;
+    std::this_thread::sleep_for(std::chrono::milliseconds(attempt_sleep_ms));
+  }
+  rclcpp::QoS qos = qos_opt.value_or(kQoS);
+
+  RCLCPP_DEBUG(
+    get_logger(),
+    "[MonitorNode] Using QoS profile: history=%s, depth=%ld, reliability=%s, durability=%s",
+    qos.get_rmw_qos_profile().history == RMW_QOS_POLICY_HISTORY_KEEP_LAST ? "KEEP_LAST" : "KEEP_ALL",
+    qos.get_rmw_qos_profile().depth,
+    qos.get_rmw_qos_profile().reliability == RMW_QOS_POLICY_RELIABILITY_RELIABLE ? "RELIABLE" : "BEST_EFFORT",
+    qos.get_rmw_qos_profile().durability == RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL ? "TRANSIENT_LOCAL" : "VOLATILE");
+
+  return qos;
 }
 
 void MonitorNode::CreateGenericTypeMonitorSubscriber()
@@ -62,10 +83,12 @@ void MonitorNode::CreateGenericTypeMonitorSubscriber()
     this,
     std::placeholders::_1);
 
+  rclcpp::QoS qos = ResolveTopicQoS("output", 10, 100);
+
   monitor_sub_ = this->create_generic_subscription(
     "output",  // topic name
     monitor_data_format_,  // message type in the form of "package/type"
-    kQoS,
+    qos,
     monitor_subscriber_callback);
 
   RCLCPP_INFO(
@@ -127,6 +150,11 @@ void MonitorNode::StartMonitoringServiceCallback(
   RCLCPP_DEBUG(
     get_logger(),
     "[MonitorNode] Enter monitor node callback");
+
+  if (monitor_sub_ == nullptr) {
+    // Create a monitor subscriber
+    CreateGenericTypeMonitorSubscriber();
+  }
 
   revise_timestamps_as_message_ids_ = request->revise_timestamps_as_message_ids;
 

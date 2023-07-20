@@ -18,6 +18,8 @@
 #ifndef ROS2_BENCHMARK__COMMON_HPP_
 #define ROS2_BENCHMARK__COMMON_HPP_
 
+#include <optional>
+
 #include "rclcpp/rclcpp.hpp"
 
 namespace ros2_benchmark
@@ -32,6 +34,26 @@ const rclcpp::QoS kBufferQoS{
   {RMW_QOS_POLICY_HISTORY_KEEP_LAST, 1000}, rmw_qos_profile_parameters};
 
 const int kThreadDelay{50};
+
+std::optional<rclcpp::QoS> getTopicQos(rclcpp::Node * node, const std::string & topic)
+{
+  /**
+   * Given a topic name, get the QoS profile with which it is being published.
+   * @param node pointer to the ROS node
+   * @param topic name of the topic
+   * @returns QoS profile of the publisher to the topic. If there are several publishers, it returns
+   *     returns the profile of the first one on the list. If no publishers exist, it returns
+   *     an empty value (optional).
+   */
+  std::string topic_resolved = node->get_node_base_interface()->resolve_topic_or_service_name(
+    topic, false);
+  auto topics_info = node->get_publishers_info_by_topic(topic_resolved);
+  if (topics_info.size()) {
+    auto profile = topics_info[0].qos_profile().get_rmw_qos_profile();
+    return rclcpp::QoS{{RMW_QOS_POLICY_HISTORY_KEEP_LAST, 1000}, profile};
+  }
+  return {};
+}
 
 }  // namespace ros2_benchmark
 

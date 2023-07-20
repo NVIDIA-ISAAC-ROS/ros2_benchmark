@@ -67,6 +67,9 @@ protected:
   /// Record an end timestamp with an automatic generated key.
   bool RecordEndTimestampAutoKey();
 
+  /// Resolve the QoS profile for the topic to be monitored.
+  rclcpp::QoS ResolveTopicQoS(std::string topic_name, int num_retries, int retry_sleep_ms);
+
   /// Index of this monitor node.
   uint32_t monitor_index_;
 
