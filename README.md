@@ -68,7 +68,7 @@ To use and learn to use `ros2_benchmark`, start by running a sample benchmark. F
     ```bash
     export R2B_WS_HOME=~/ros_ws && \
     export ROS2_BENCHMARK_OVERRIDE_ASSETS_ROOT=$R2B_WS_HOME/src/ros2_benchmark/assets && \
-    sudo apt-get update && sudo apt-get install -y git wget
+    sudo apt-get update && sudo apt-get install -y git git-lfs wget
     ```
 
 3. Clone this repository along with an available implementation of Apriltag detection and install dependencies.
@@ -76,13 +76,13 @@ To use and learn to use `ros2_benchmark`, start by running a sample benchmark. F
     ```bash
     mkdir -p $R2B_WS_HOME/src && cd $R2B_WS_HOME/src && \
         git clone https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark.git && \
-        git clone https://github.com/christianrauch/apriltag_ros.git && \        
+        git clone https://github.com/christianrauch/apriltag_ros.git && \
     cd $R2B_WS_HOME && \
         sudo apt-get update && \
         rosdep install -i -r --from-paths src --rosdistro humble -y
     ```
 
-4. Clone, and build `image_proc` package.
+4. Clone, and build `image_proc` package with patch to fix incompatible QoS settings.
 
     ```bash
     cd $R2B_WS_HOME/src && \
@@ -90,6 +90,8 @@ To use and learn to use `ros2_benchmark`, start by running a sample benchmark. F
     cd $R2B_WS_HOME/src && \
       git clone https://github.com/ros-perception/image_pipeline.git && cd image_pipeline && git checkout humble && \
       git config user.email "benchmarking@ros2_benchmark.com" && git config user.name "ROS 2 Developer" && \
+      wget https://raw.githubusercontent.com/NVIDIA-ISAAC-ROS/ros2_benchmark/main/resources/patch/resize_qos_profile.patch && \
+      git apply resize_qos_profile.patch && \
     cd $R2B_WS_HOME && \
       sudo apt-get update && \
       rosdep install -i -r --from-paths src --rosdistro humble -y && \
