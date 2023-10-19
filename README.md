@@ -82,7 +82,7 @@ To use and learn to use `ros2_benchmark`, start by running a sample benchmark. F
         rosdep install -i -r --from-paths src --rosdistro humble -y
     ```
 
-4. Clone, and build `image_proc` package with patch to fix incompatible QoS settings.
+4. Clone and build `image_proc` package with patch to fix incompatible QoS settings.
 
     ```bash
     cd $R2B_WS_HOME/src && \
@@ -103,8 +103,8 @@ To use and learn to use `ros2_benchmark`, start by running a sample benchmark. F
     ```bash
     mkdir -p $R2B_WS_HOME/src/ros2_benchmark/assets/datasets/r2b_dataset/r2b_storage && \
     cd $R2B_WS_HOME/src/ros2_benchmark/assets/datasets/r2b_dataset/r2b_storage && \
-      wget --content-disposition 'https://api.ngc.nvidia.com/v2/resources/nvidia/isaac/r2bdataset2023/versions/1/files/r2b_storage/metadata.yaml' && \
-      wget --content-disposition 'https://api.ngc.nvidia.com/v2/resources/nvidia/isaac/r2bdataset2023/versions/1/files/r2b_storage/r2b_storage_0.db3'
+      wget --content-disposition 'https://api.ngc.nvidia.com/v2/resources/nvidia/isaac/r2bdataset2023/versions/2/files/r2b_storage/metadata.yaml' && \
+      wget --content-disposition 'https://api.ngc.nvidia.com/v2/resources/nvidia/isaac/r2bdataset2023/versions/2/files/r2b_storage/r2b_storage_0.db3'
     ```
 
 6. Build `ros2_benchmark` and source the workspace:
@@ -147,13 +147,13 @@ wget --content-disposition https://ngc.nvidia.com/downloads/ngccli_linux.zip && 
 With the NGC CLI available, you can download the dataset with the following commands:
 
 ```bash
-./ngc-cli/ngc registry resource download-version "nvidia/isaac/r2bdataset2023:1"
+./ngc-cli/ngc registry resource download-version "nvidia/isaac/r2bdataset2023:2"
 ```
 
 Then, move the datasets to their required location:
 
 ```bash
-mv r2bdataset2023_v1 assets/datasets/r2b_dataset
+mv r2bdataset2023_v2 assets/datasets/r2b_dataset
 ```
 
 | Sequence                                                                                          | Size | Visual                                                                                     | Contents                                                                                                                                                                       | Description                                                                                                                                                                                        |
@@ -181,21 +181,21 @@ Included in the log is information on the host system on which results were meas
 
 The following are the performance results measured with `ros2_benchmark` on `aarch64` and `x86_64` platforms, using ROS 2 Humble in March 2023. The table below also contains links to the packages for the nodes used in the benchmark and to the complete results JSON files.
 
-| Node                                                                                                                                               | Input Size | Intel NUC Corei7 11th Gen                                                                                                                   | AGX Orin (CPU only)                                                                                                                       |
-| -------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| [AprilTag Node](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/scripts/apriltag_ros_apriltag_node.py)                                | 720p       | [90.8 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/apriltag_ros_apriltag_node-nuc_4060ti.json)<br>11 ms        | [56.3 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/apriltag_ros_apriltag_node-agx_orin.json)<br>18 ms        |
-| [Rectify Node](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/scripts/image_proc_rectify_node.py)                                    | 1080p      | [539 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/image_proc_rectify_node-nuc_4060ti.json)<br>1.9 ms           | [185 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/image_proc_rectify_node-agx_orin.json)<br>5.6 ms           |
-| [H.264 Encoder Node<br>I-frame Support](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/scripts/image_transport_h264_decoder_node.py) | 1080p      | [60.5 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/image_transport_h264_decoder_node-nuc_4060ti.json)<br>19 ms | [28.0 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/image_transport_h264_decoder_node-agx_orin.json)<br>37 ms |
-| [H.264 Encoder Node<br>P-frame Support](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/scripts/image_transport_h264_encoder_node.py) | 1080p      | [43.4 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/image_transport_h264_encoder_node-nuc_4060ti.json)<br>24 ms | [10.2 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/image_transport_h264_encoder_node-agx_orin.json)<br>95 ms |
-| [Stereo Disparity Node](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/scripts/stereo_image_proc_node.py)                            | 1080p      | [99.5 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/stereo_image_proc_node-nuc_4060ti.json)<br>6.4 ms           | [66.5 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/stereo_image_proc_node-agx_orin.json)<br>15 ms            |
+| Node                                                                                                                                                       | Input Size | Intel NUC Corei7 11th Gen                                                                                                                           | AGX Orin (CPU only)                                                                                                                               |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [AprilTag Node](https://gitlab-master.nvidia.com/isaac_ros/ros2_benchmark/-/blob/dev/scripts/apriltag_ros_apriltag_node.py)                                | 720p       | [90.8 fps](https://gitlab-master.nvidia.com/isaac_ros/ros2_benchmark/-/blob/dev/results/apriltag_ros_apriltag_node-nuc_4060ti.json)<br>11 ms        | [56.3 fps](https://gitlab-master.nvidia.com/isaac_ros/ros2_benchmark/-/blob/dev/results/apriltag_ros_apriltag_node-agx_orin.json)<br>18 ms        |
+| [Rectify Node](https://gitlab-master.nvidia.com/isaac_ros/ros2_benchmark/-/blob/dev/scripts/image_proc_rectify_node.py)                                    | 1080p      | [539 fps](https://gitlab-master.nvidia.com/isaac_ros/ros2_benchmark/-/blob/dev/results/image_proc_rectify_node-nuc_4060ti.json)<br>1.9 ms           | [185 fps](https://gitlab-master.nvidia.com/isaac_ros/ros2_benchmark/-/blob/dev/results/image_proc_rectify_node-agx_orin.json)<br>5.6 ms           |
+| [H.264 Encoder Node<br>I-frame Support](https://gitlab-master.nvidia.com/isaac_ros/ros2_benchmark/-/blob/dev/scripts/image_transport_h264_decoder_node.py) | 1080p      | [60.5 fps](https://gitlab-master.nvidia.com/isaac_ros/ros2_benchmark/-/blob/dev/results/image_transport_h264_decoder_node-nuc_4060ti.json)<br>19 ms | [28.0 fps](https://gitlab-master.nvidia.com/isaac_ros/ros2_benchmark/-/blob/dev/results/image_transport_h264_decoder_node-agx_orin.json)<br>37 ms |
+| [H.264 Encoder Node<br>P-frame Support](https://gitlab-master.nvidia.com/isaac_ros/ros2_benchmark/-/blob/dev/scripts/image_transport_h264_encoder_node.py) | 1080p      | [43.4 fps](https://gitlab-master.nvidia.com/isaac_ros/ros2_benchmark/-/blob/dev/results/image_transport_h264_encoder_node-nuc_4060ti.json)<br>24 ms | [10.2 fps](https://gitlab-master.nvidia.com/isaac_ros/ros2_benchmark/-/blob/dev/results/image_transport_h264_encoder_node-agx_orin.json)<br>95 ms |
+| [Stereo Disparity Node](https://gitlab-master.nvidia.com/isaac_ros/ros2_benchmark/-/blob/dev/scripts/stereo_image_proc_node.py)                            | 1080p      | [99.5 fps](https://gitlab-master.nvidia.com/isaac_ros/ros2_benchmark/-/blob/dev/results/stereo_image_proc_node-nuc_4060ti.json)<br>6.4 ms           | [66.5 fps](https://gitlab-master.nvidia.com/isaac_ros/ros2_benchmark/-/blob/dev/results/stereo_image_proc_node-agx_orin.json)<br>15 ms            |
 
-| Graph                                                                                                                     | Input Size | Intel NUC Corei7 11th Gen                                                                                                             | AGX Orin (CPU only)                                                                                                                 |
-| ------------------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| [AprilTag Graph](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/scripts/apriltag_ros_apriltag_graph.py)     | 720p       | [88.1 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/apriltag_ros_apriltag_graph-nuc_4060ti.json)<br>12 ms | [56.3 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/apriltag_ros_apriltag_graph-agx_orin.json)<br>22 ms |
-| [Stereo Disparity Graph](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/scripts/stereo_image_proc_graph.py) | 1080p      | [99.4 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/stereo_image_proc_graph-nuc_4060ti.json)<br>16 ms     | [63.5 fps](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/results/stereo_image_proc_graph-agx_orin.json)<br>28 ms     |
+| Graph                                                                                                                             | Input Size | Intel NUC Corei7 11th Gen                                                                                                                     | AGX Orin (CPU only)                                                                                                                         |
+| --------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| [AprilTag Graph](https://gitlab-master.nvidia.com/isaac_ros/ros2_benchmark/-/blob/dev/scripts/apriltag_ros_apriltag_graph.py)     | 720p       | [88.1 fps](https://gitlab-master.nvidia.com/isaac_ros/ros2_benchmark/-/blob/dev/results/apriltag_ros_apriltag_graph-nuc_4060ti.json)<br>12 ms | [56.3 fps](https://gitlab-master.nvidia.com/isaac_ros/ros2_benchmark/-/blob/dev/results/apriltag_ros_apriltag_graph-agx_orin.json)<br>22 ms |
+| [Stereo Disparity Graph](https://gitlab-master.nvidia.com/isaac_ros/ros2_benchmark/-/blob/dev/scripts/stereo_image_proc_graph.py) | 1080p      | [99.4 fps](https://gitlab-master.nvidia.com/isaac_ros/ros2_benchmark/-/blob/dev/results/stereo_image_proc_graph-nuc_4060ti.json)<br>16 ms     | [63.5 fps](https://gitlab-master.nvidia.com/isaac_ros/ros2_benchmark/-/blob/dev/results/stereo_image_proc_graph-agx_orin.json)<br>28 ms     |
 
 
-> **Note**: All results above are using ROS 2 nodes from open source that run computation on the CPU only. For GPU-accelerated equivalent packages, see [Isaac ROS](https://github.com/NVIDIA-ISAAC-ROS).
+> **Note**: All results above are using ROS 2 nodes from open source that run computation on the CPU only. For GPU-accelerated equivalent packages, see [Isaac ROS](https://gitlab-master.nvidia.com/isaac_ros).
 
 ### Explanation of the Results JSON Format
 
@@ -396,7 +396,7 @@ Follow these steps to ensure that everything in the template is configured corre
 5. Insert your custom nodes declared in step 1 to the composable node container.
 6. Revise/add benchmark configurations under `ROS2BenchmarkConfig` declaration based on your custom graph.
 
-The full benchmark configuration options can be found [here](https://github.com/NVIDIA-ISAAC-ROS/ros2_benchmark/blob/main/ros2_benchmark/ros2_benchmark/default_ros2_benchmark_config.yaml) in the default `ros2_benchmark` configuration file.
+The full benchmark configuration options can be found [here](https://gitlab-master.nvidia.com/isaac_ros/ros2_benchmark/-/blob/dev/ros2_benchmark/ros2_benchmark/default_ros2_benchmark_config.yaml) in the default `ros2_benchmark` configuration file.
 
 ## Profiling
 

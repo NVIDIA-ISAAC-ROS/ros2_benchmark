@@ -63,8 +63,8 @@ void MonitorNode::CreateGenericTypeMonitorSubscriber()
     std::placeholders::_1);
 
   monitor_sub_ = this->create_generic_subscription(
-    "output",  // topic name
-    monitor_data_format_,  // message type in the form of "package/type"
+    "output",                 // topic name
+    monitor_data_format_,     // message type in the form of "package/type"
     kQoS,
     monitor_subscriber_callback);
 
@@ -149,7 +149,8 @@ void MonitorNode::StartMonitoringServiceCallback(
     timestamps.timestamps_ns.emplace_back(
       // Convert to nanoseconds
       std::chrono::duration_cast<std::chrono::nanoseconds>(
-        it.second.time_since_epoch()).count());
+        it.second.time_since_epoch())
+      .count());
   }
 
   response->timestamps = timestamps;

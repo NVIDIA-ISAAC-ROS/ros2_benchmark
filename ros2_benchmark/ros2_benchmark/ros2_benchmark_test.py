@@ -31,6 +31,7 @@ import unittest
 import launch
 from launch.actions import OpaqueFunction
 import launch_testing.actions
+
 import rclpy
 
 from ros2_benchmark_interfaces.srv import GetTopicMessageTimestamps, PlayMessages
@@ -258,6 +259,11 @@ class ROS2BenchmarkTest(unittest.TestCase):
     def get_assets_root_path(cls):
         """Get assets path provided in configurations."""
         return cls.config.assets_root
+
+    @classmethod
+    def get_ros1_ws_path(cls):
+        """Get ros1 workspace path provided in configurations."""
+        return cls.config.ros1_ws
 
     def get_input_data_absolute_path(self):
         """Construct the absolute path of the input data file from configurations."""

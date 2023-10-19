@@ -25,7 +25,7 @@ import yaml
 from .basic_performance_calculator import BasicPerformanceCalculator
 from .utils.image_utility import Resolution
 
-BUILTIN_ROS2_BENCHMARK_CONFIG_FILE = os.path.join(
+BUILTIN_ros2_benchmark_CONFIG_FILE = os.path.join(
     os.path.dirname(__file__),
     'default_ros2_benchmark_config.yaml')
 
@@ -63,7 +63,7 @@ class BenchmarkMode(Enum):
 class ROS2BenchmarkConfig():
     """A class that holds configurations for ros2_benchmark."""
 
-    __builtin_config_file_path = BUILTIN_ROS2_BENCHMARK_CONFIG_FILE
+    __builtin_config_file_path = BUILTIN_ros2_benchmark_CONFIG_FILE
 
     # It is only necessary to add a parameter to this map if we want
     # to enable overriding such a parameter from an env variable and

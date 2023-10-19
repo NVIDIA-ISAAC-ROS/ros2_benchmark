@@ -110,13 +110,13 @@ private:
     get_topic_message_timestamps_service_;
 
   /// The path of the rosbag to be loaded.
-  std::string rosbag_path_ {""};
+  std::string rosbag_path_{""};
 
   /// The earlies timestamp observed in the loaded rosbag.
-  int64_t first_timestamp_ns_ {0};
+  int64_t first_timestamp_ns_{0};
 
   /// The latest timestamp observed in the loaded rosbag.
-  int64_t last_timestamp_ns_ {0};
+  int64_t last_timestamp_ns_{0};
 
   /// Timeline (rosbag-recorded timestamps) of the messages loaded from the rosbag.
   std::unordered_map<std::string, std::vector<int64_t>> topic_message_timestamps_;
@@ -127,9 +127,9 @@ private:
   int64_t publisher_period_ms_;
 
   /// Counter for tracking the number of messages being published.
-  uint64_t played_message_count_ {0};
+  uint64_t played_message_count_{0};
 
-  bool stop_playing_ {false};
+  bool stop_playing_{false};
   std::mutex stop_playing_mutex_;
 
   /// A rosbag reader.
@@ -139,7 +139,7 @@ private:
   rosbag2_compression_zstd::ZstdDecompressor decompressor_;
 
   /// Whether messages in the loaded rosbag are zstd-message-compressed.
-  bool is_rosbag_compressed_ {false};
+  bool is_rosbag_compressed_{false};
 
   /// Generic publishers for all topics available from the loaded rosbag.
   std::unordered_map<std::string, std::shared_ptr<rclcpp::GenericPublisher>> publishers_;
