@@ -116,8 +116,8 @@ void PlaybackNode::CreateGenericPubSub(const std::string data_format, const size
     index);
 
   std::shared_ptr<rclcpp::SubscriptionBase> sub = this->create_generic_subscription(
-    "buffer/input" + std::to_string(index),  // topic name
-    data_format,  // message type in the form of "package/type"
+    "buffer/input" + std::to_string(index),     // topic name
+    data_format,                                // message type in the form of "package/type"
     kBufferQoS,
     generic_type_subscriber_callback);
 
@@ -192,7 +192,7 @@ bool PlaybackNode::PublishMessage(
     const std::string topic_name = generic_pubs_[pub_index]->get_topic_name();
     RCLCPP_ERROR(
       get_logger(),
-      "Failed to publish message index %ld for topic %s. " \
+      "Failed to publish message index %ld for topic %s. "
       "Total recorded messages = %ld",
       message_index, topic_name.c_str(), buffer_size);
     return false;
@@ -202,14 +202,14 @@ bool PlaybackNode::PublishMessage(
     // Update the sec field in the serialized message
     uint8_t * header_sec_ptr =
       const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(&header->stamp.sec));
-    serialized_msg_buffers_[pub_index].at(message_index)
-    .get()->get_rcl_serialized_message().buffer[4] = *(header_sec_ptr);
-    serialized_msg_buffers_[pub_index].at(message_index)
-    .get()->get_rcl_serialized_message().buffer[5] = *(header_sec_ptr + 1);
-    serialized_msg_buffers_[pub_index].at(message_index)
-    .get()->get_rcl_serialized_message().buffer[6] = *(header_sec_ptr + 2);
-    serialized_msg_buffers_[pub_index].at(message_index)
-    .get()->get_rcl_serialized_message().buffer[7] = *(header_sec_ptr + 3);
+    serialized_msg_buffers_[pub_index].at(message_index).get()->get_rcl_serialized_message().buffer[
+      4] = *(header_sec_ptr);
+    serialized_msg_buffers_[pub_index].at(message_index).get()->get_rcl_serialized_message().buffer[
+      5] = *(header_sec_ptr + 1);
+    serialized_msg_buffers_[pub_index].at(message_index).get()->get_rcl_serialized_message().buffer[
+      6] = *(header_sec_ptr + 2);
+    serialized_msg_buffers_[pub_index].at(message_index).get()->get_rcl_serialized_message().buffer[
+      7] = *(header_sec_ptr + 3);
   }
 
   generic_pubs_[pub_index]->publish(
@@ -278,7 +278,7 @@ void PlaybackNode::StartRecordingServiceCallback(
   if (!record_data_timeline_ && request->topic_message_timestamps.size() > 0) {
     for (const auto & topic_message_timestamps : request->topic_message_timestamps) {
       const std::string topic_name = topic_message_timestamps.topic_name;
-      for (const auto & [sub_index, sub_ptr] : subs_) {
+      for (const auto &[sub_index, sub_ptr] : subs_) {
         const std::string sub_topic_name = sub_ptr->get_topic_name();
 
         // A topic translation is required if there are nodes between a data loader
@@ -332,7 +332,7 @@ void PlaybackNode::StartRecordingServiceCallback(
 
   // Respond with the number of messages recorded in each topic
   response->recorded_message_count = GetRecordedMessageCount();
-  for (const auto & [sub_index, sub_ptr] : subs_) {
+  for (const auto &[sub_index, sub_ptr] : subs_) {
     ros2_benchmark_interfaces::msg::TopicMessageCount topic_message_count{};
     topic_message_count.topic_name = sub_ptr->get_topic_name();
     topic_message_count.message_count = GetRecordedMessageCount(sub_index);
@@ -385,7 +385,7 @@ void PlaybackNode::PlayMessagesTimelinePlayback(
   if (timestamps_to_messages_map_.size() == 0) {
     RCLCPP_ERROR(
       get_logger(),
-      "Could not play messages in the timeline playback mode due to missing " \
+      "Could not play messages in the timeline playback mode due to missing "
       "message timestamp information");
     response->success = false;
     return;
@@ -400,7 +400,7 @@ void PlaybackNode::PlayMessagesTimelinePlayback(
   rclcpp::Time initial_timestamp = this->get_clock()->now();
   int64_t timestamp_offset =
     initial_timestamp.nanoseconds() - timestamps_to_messages_map_.begin()->first;
-  for (const auto & [next_timestamp, message_list] : timestamps_to_messages_map_) {
+  for (const auto &[next_timestamp, message_list] : timestamps_to_messages_map_) {
     while (true) {
       rclcpp::Time now = this->get_clock()->now();
       int64_t diff_to_next_timestamp = (next_timestamp + timestamp_offset) - now.nanoseconds();
@@ -435,7 +435,8 @@ void PlaybackNode::PlayMessagesTimelinePlayback(
     response_timestamps.keys.emplace_back(it.first);
     response_timestamps.timestamps_ns.emplace_back(
       std::chrono::duration_cast<std::chrono::nanoseconds>(
-        it.second.time_since_epoch()).count());
+        it.second.time_since_epoch())
+      .count());
   }
   response->timestamps = response_timestamps;
   response->success = true;
@@ -530,7 +531,8 @@ void PlaybackNode::PlayMessagesLoopingSweeping(
     timestamps.timestamps_ns.emplace_back(
       // Convert to nanoseconds
       std::chrono::duration_cast<std::chrono::nanoseconds>(
-        it.second.time_since_epoch()).count());
+        it.second.time_since_epoch())
+      .count());
   }
 
   // Finally, mark success as true
@@ -575,7 +577,7 @@ const std::vector<std::string>
 PlaybackNode::GetRecordedTopicNames()
 {
   std::vector<std::string> topic_names;
-  for (const auto & [sub_index, sub_ptr] : subs_) {
+  for (const auto &[sub_index, sub_ptr] : subs_) {
     topic_names.push_back(sub_ptr->get_topic_name());
   }
   return topic_names;

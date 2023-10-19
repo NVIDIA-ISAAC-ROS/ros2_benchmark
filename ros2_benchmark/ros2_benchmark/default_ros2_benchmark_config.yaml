@@ -132,6 +132,9 @@ ros2_benchmark_config:
     # The directory for storing assets
     assets_root: "/workspaces/isaac_ros-dev/src/ros2_benchmark/assets"
 
+    # The path to ros1 workspace
+    ros1_ws: "/workspaces/isaac_ros-dev/isaac_ros_1-dev"
+
     # The path, relative to "assets_root", of the file (usually a rosbag) to be
     # loaded by a data loader node
     input_data_path: ""

@@ -87,6 +87,12 @@ if(BUILD_TESTING)
 
   ament_lint_auto_find_test_dependencies()
 
+
+  # The FindPythonInterp and FindPythonLibs modules are removed
+  if(POLICY CMP0148)
+    cmake_policy(SET CMP0148 OLD)
+  endif()
+
   find_package(launch_testing_ament_cmake REQUIRED)
   add_launch_test(test/data_loader_node_pol.py TIMEOUT "15")
   add_launch_test(test/monitor_node_pol.py TIMEOUT "15")

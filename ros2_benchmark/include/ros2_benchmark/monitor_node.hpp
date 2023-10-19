@@ -29,7 +29,6 @@
 
 #include "ros2_benchmark_interfaces/srv/start_monitoring.hpp"
 
-
 namespace ros2_benchmark
 {
 

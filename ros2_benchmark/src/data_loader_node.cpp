@@ -53,7 +53,8 @@ DataLoaderNode::DataLoaderNode(const rclcpp::NodeOptions & options)
     create_service<ros2_benchmark_interfaces::srv::StopLoading>(
       "stop_loading",
       std::bind(&DataLoaderNode::StopLoadingServiceCallback, this, std::placeholders::_1,
-      std::placeholders::_2), rmw_qos_profile_default, service_callback_group_)},
+      std::placeholders::_2),
+      rmw_qos_profile_default, service_callback_group_)},
   get_topic_message_timestamps_service_{
     create_service<ros2_benchmark_interfaces::srv::GetTopicMessageTimestamps>(
       "get_topic_message_timestamps",
@@ -332,7 +333,7 @@ DataLoaderNode::CreateTopicMessageTimestampArrayMessageList(
   const int64_t end_time_ns)
 {
   std::vector<ros2_benchmark_interfaces::msg::TopicMessageTimestampArray> message_list;
-  for (const auto & [topic_name, recorded_timestamps] : topic_message_timestamps_) {
+  for (const auto &[topic_name, recorded_timestamps] : topic_message_timestamps_) {
     ros2_benchmark_interfaces::msg::TopicMessageTimestampArray topic_timestamps{};
     topic_timestamps.topic_name = topic_name;
     topic_timestamps.timestamps_ns = FilterValuesByRange(
@@ -347,9 +348,9 @@ void DataLoaderNode::OpenRosbagFile()
   rcpputils::fs::path rosbag_path(rosbag_path_);
   if (!rosbag_path.exists()) {
     std::stringstream error_msg;
-    error_msg << "Could not load a rosbag file. "
-              << "\"" << rosbag_path.string()
-              << "\" does not exist";
+    error_msg << "Could not load a rosbag file. " <<
+      "\"" << rosbag_path.string() <<
+      "\" does not exist";
     RCLCPP_ERROR(get_logger(), error_msg.str().c_str());
     throw std::runtime_error(error_msg.str().c_str());
   }
@@ -391,7 +392,6 @@ void DataLoaderNode::PublishMessage(
   }
   publisher->publish(rclcpp::SerializedMessage(*message->serialized_data));
 }
-
 
 DataLoaderNode::~DataLoaderNode()
 {
