@@ -20,11 +20,15 @@
 
 # The number of messages expected to be received during monitoring.
 # The service returns early when all the expected messages are received.
+# Ignored if set to 0.
 uint64 message_count
 
 # Whether to use header.stamp.sec in each message's header as a message
 # ID field
 bool revise_timestamps_as_message_ids false
+
+# Whether to record timestamps in the incoming messages as start timestamps
+bool record_start_timestamps false
 
 # The maximum time, in seconds, to wait for receiving all expected
 # messages.
@@ -32,5 +36,9 @@ int64 timeout
 
 ---
 
+# A list of message key-timestamp pairs for when the messages are published.
+# Empty if record_start_timestamps is false.
+TimestampedMessageArray start_timestamps
+
 # A list of message key-timestamp pairs for when the messages are received
-TimestampedMessageArray timestamps
+TimestampedMessageArray end_timestamps

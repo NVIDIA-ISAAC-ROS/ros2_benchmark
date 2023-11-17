@@ -58,6 +58,7 @@ class BenchmarkMode(Enum):
     TIMELINE = 0
     LOOPING = 1
     SWEEPING = 2
+    LIVE = 3
 
 
 class ROS2BenchmarkConfig():
@@ -70,6 +71,7 @@ class ROS2BenchmarkConfig():
     # its type is not string (as env only supports string values).
     __config_type_map = {
         'revise_timestamps_as_message_ids': bool,
+        'collect_start_timestamps_from_monitors': bool,
         'enable_cpu_profiler': bool,
         'publish_tf_messages_in_set_data': bool,
         'publish_tf_static_messages_in_set_data': bool,

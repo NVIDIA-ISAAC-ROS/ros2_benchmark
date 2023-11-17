@@ -36,6 +36,9 @@ ros2_benchmark_config:
     # Use timestamp's sec field in a message header as message IDs for benchmarking
     revise_timestamps_as_message_ids: false
 
+    # Collect start timestamps from the messages observed by monitors
+    collect_start_timestamps_from_monitors: false
+
     # Enable CPU profiling during benchmarking
     enable_cpu_profiler: true
 

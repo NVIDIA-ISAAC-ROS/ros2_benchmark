@@ -367,9 +367,10 @@ class ROS2BenchmarkTest(unittest.TestCase):
         if self.config.benchmark_mode in [BenchmarkMode.LOOPING, BenchmarkMode.SWEEPING]:
             metadata[BenchmarkMetadata.PEAK_THROUGHPUT_PREDICTION] = \
                 self._peak_throughput_prediction
-        metadata[BenchmarkMetadata.INPUT_DATA_PATH] = self.get_input_data_absolute_path()
-        metadata[BenchmarkMetadata.INPUT_DATA_SIZE] = self._input_data_size_bytes
-        metadata[BenchmarkMetadata.INPUT_DATA_HASH] = self._input_data_hash
+        if self.config.input_data_path:
+            metadata[BenchmarkMetadata.INPUT_DATA_PATH] = self.get_input_data_absolute_path()
+            metadata[BenchmarkMetadata.INPUT_DATA_SIZE] = self._input_data_size_bytes
+            metadata[BenchmarkMetadata.INPUT_DATA_HASH] = self._input_data_hash
         if self.config.input_data_start_time != -1:
             metadata[BenchmarkMetadata.INPUT_DATA_START_TIME] = \
                 self.config.input_data_start_time
@@ -585,7 +586,10 @@ class ROS2BenchmarkTest(unittest.TestCase):
             get_topic_message_timestamps_future, check_success=True)
         return get_topic_message_timestamps_response.topic_message_timestamps
 
-    def benchmark_body(self, playback_message_count, target_freq) -> dict:
+    def benchmark_body(self,
+                       playback_message_count=0,
+                       target_freq=0,
+                       play_messages=True) -> dict:
         """
         Run benchmark test.
 
@@ -595,10 +599,19 @@ class ROS2BenchmarkTest(unittest.TestCase):
             The number of messages to be tested
         target_freq :
             Target test publisher rate
+        play_messages :
+            Enable publishing benchmark messages from a playback node
+
+        Returns
+        -------
+        dict
+            Performance results
 
         """
         # Create play_messages service
-        play_messages_client = self.create_service_client_blocking(PlayMessages, 'play_messages')
+        if play_messages:
+            play_messages_client = self.create_service_client_blocking(
+                PlayMessages, 'play_messages')
 
         # Create and send monitor service requests
         monitor_service_client_map = {}
@@ -614,10 +627,16 @@ class ROS2BenchmarkTest(unittest.TestCase):
             self.get_logger().info(
                 f'Requesting to monitor end messages from service "{monitor_info.service_name}".')
             start_monitoring_request = StartMonitoring.Request()
-            start_monitoring_request.timeout = self.config.start_monitoring_service_timeout_sec
-            start_monitoring_request.message_count = playback_message_count
+            if not play_messages:
+                start_monitoring_request.timeout = int(self.config.benchmark_duration)
+                start_monitoring_request.message_count = 0
+            else:
+                start_monitoring_request.timeout = self.config.start_monitoring_service_timeout_sec
+                start_monitoring_request.message_count = playback_message_count
             start_monitoring_request.revise_timestamps_as_message_ids = \
                 self.config.revise_timestamps_as_message_ids
+            start_monitoring_request.record_start_timestamps = \
+                self.config.collect_start_timestamps_from_monitors
             start_monitoring_future = start_monitoring_client.call_async(
                 start_monitoring_request)
 
@@ -630,43 +649,59 @@ class ROS2BenchmarkTest(unittest.TestCase):
             self._cpu_profiler.start_profiling(self.config.cpu_profiling_interval_sec)
             self.get_logger().info('CPU profiling stared.')
 
-        # Start playing messages
-        self.get_logger().info(
-            f'Requesting to play messages in playback_mode = {self.config.benchmark_mode}.')
-        play_messages_request = PlayMessages.Request()
-        play_messages_request.playback_mode = self.config.benchmark_mode.value
-        play_messages_request.target_publisher_rate = target_freq
-        play_messages_request.message_count = playback_message_count
-        play_messages_request.enforce_publisher_rate = self.config.enforce_publisher_rate
-        play_messages_request.revise_timestamps_as_message_ids = \
-            self.config.revise_timestamps_as_message_ids
-        play_messages_future = play_messages_client.call_async(play_messages_request)
+        playback_start_timestamps = {}
+        if play_messages:
+            # Start playing messages
+            self.get_logger().info(
+                f'Requesting to play messages in playback_mode = {self.config.benchmark_mode}.')
+            play_messages_request = PlayMessages.Request()
+            play_messages_request.playback_mode = self.config.benchmark_mode.value
+            play_messages_request.target_publisher_rate = target_freq
+            play_messages_request.message_count = playback_message_count
+            play_messages_request.enforce_publisher_rate = self.config.enforce_publisher_rate
+            play_messages_request.revise_timestamps_as_message_ids = \
+                self.config.revise_timestamps_as_message_ids
+            play_messages_future = play_messages_client.call_async(play_messages_request)
 
-        # Watch playback node timeout
-        self.get_logger().info('Waiting for the playback service to finish.')
-        play_messages_response = self.get_service_response_from_future_blocking(
-            play_messages_future,
-            check_success=True,
-            timeout_sec=self.config.play_messages_service_future_timeout_sec)
+            # Watch playback node timeout
+            self.get_logger().info('Waiting for the playback service to finish.')
+            play_messages_response = self.get_service_response_from_future_blocking(
+                play_messages_future,
+                check_success=True,
+                timeout_sec=self.config.play_messages_service_future_timeout_sec)
 
-        start_timestamps = {}
-        for i in range(len(play_messages_response.timestamps.keys)):
-            key = play_messages_response.timestamps.keys[i]
-            start_timestamp = play_messages_response.timestamps.timestamps_ns[i]
-            start_timestamps[key] = start_timestamp
+            for i in range(len(play_messages_response.timestamps.keys)):
+                key = play_messages_response.timestamps.keys[i]
+                start_timestamp = play_messages_response.timestamps.timestamps_ns[i]
+                playback_start_timestamps[key] = start_timestamp
+        else:
+            self.get_logger().info(
+                f'Running live benchmarking for {self.config.benchmark_duration} seconds...')
+            time.sleep(int(self.config.benchmark_duration))
 
         # Get end timestamps from all monitors
+        monitor_start_timestamps_map = {}
         monitor_end_timestamps_map = {}
         for monitor_info in self.config.monitor_info_list:
             self.get_logger().info(
                 f'Waiting for the monitor service "{monitor_info.service_name}" to finish.')
             monitor_response = self.get_service_response_from_future_blocking(
                 monitor_service_future_map[monitor_info.service_name])
+            start_timestamps_from_monitor = {}
             end_timestamps = {}
-            for i in range(len(monitor_response.timestamps.keys)):
-                key = monitor_response.timestamps.keys[i]
-                end_timestamp = monitor_response.timestamps.timestamps_ns[i]
+            for i in range(len(monitor_response.end_timestamps.keys)):
+                key = monitor_response.end_timestamps.keys[i]
+                end_timestamp = monitor_response.end_timestamps.timestamps_ns[i]
                 end_timestamps[key] = end_timestamp
+                if self.config.collect_start_timestamps_from_monitors:
+                    start_timestamp = monitor_response.start_timestamps.timestamps_ns[i]
+                    start_timestamps_from_monitor[key] = start_timestamp
+            if self.config.collect_start_timestamps_from_monitors:
+                monitor_start_timestamps_map[monitor_info.service_name] = \
+                    start_timestamps_from_monitor
+            else:
+                monitor_start_timestamps_map[monitor_info.service_name] = \
+                    playback_start_timestamps
             monitor_end_timestamps_map[monitor_info.service_name] = end_timestamps
 
         # Stop CPU profiler
@@ -677,6 +712,7 @@ class ROS2BenchmarkTest(unittest.TestCase):
         # Calculate performance results
         performance_results = {}
         for monitor_info in self.config.monitor_info_list:
+            start_timestamps = monitor_start_timestamps_map[monitor_info.service_name]
             end_timestamps = monitor_end_timestamps_map[monitor_info.service_name]
             if len(end_timestamps) == 0:
                 error_message = 'No messages were observed from the monitor node ' + \
@@ -848,29 +884,75 @@ class ROS2BenchmarkTest(unittest.TestCase):
         self.get_logger().info('Executing pre-benchmark setup')
         self.pre_benchmark_hook()
 
-        # Prepare playback buffers
-        if self.config.enable_trial_buffer_preparation:
-            self.push_logger_name('Trial')
-            self.get_logger().info('Starting trial message buffering')
-            self.prepare_buffer()
-            self.pop_logger_name()
-        self.get_logger().info('Buffering test messages')
-        self.prepare_buffer()
-        self.get_logger().info('Finished buffering test messages')
-
         self.get_logger().info(f'Running benchmark: mode={self.config.benchmark_mode}')
         perf_results = {}
-        if self.config.benchmark_mode == BenchmarkMode.TIMELINE:
-            perf_results = self.run_benchmark_timeline_playback_mode()
-        elif (self.config.benchmark_mode == BenchmarkMode.LOOPING) or \
-             (self.config.benchmark_mode == BenchmarkMode.SWEEPING):
-            perf_results = self.run_benchmark_looping_mode()
+        if self.config.benchmark_mode == BenchmarkMode.LIVE:
+            perf_results = self.run_benchmark_live_mode()
+        else:
+            # Prepare playback buffers
+            if self.config.enable_trial_buffer_preparation:
+                self.push_logger_name('Trial')
+                self.get_logger().info('Starting trial message buffering')
+                self.prepare_buffer()
+                self.pop_logger_name()
+            self.get_logger().info('Buffering test messages')
+            self.prepare_buffer()
+            self.get_logger().info('Finished buffering test messages')
+
+            if self.config.benchmark_mode == BenchmarkMode.TIMELINE:
+                perf_results = self.run_benchmark_timeline_playback_mode()
+            elif (self.config.benchmark_mode == BenchmarkMode.LOOPING) or \
+                 (self.config.benchmark_mode == BenchmarkMode.SWEEPING):
+                perf_results = self.run_benchmark_looping_mode()
 
         final_report = self.construct_final_report(perf_results)
         self.print_report(final_report, sub_heading='Final Report')
         self.export_report(final_report)
 
+    def run_benchmark_live_mode(self) -> dict:
+        """
+        Run benchmarking in live mode.
+
+        This benchmark mode measures performance of a graph under test contains
+        data sources.
+        """
+        self.push_logger_name('Live')
+
+        # Run trial round
+        self.push_logger_name('Trial')
+        try:
+            performance_results = self.benchmark_body(play_messages=False)
+            self.print_report(performance_results, sub_heading='Trial')
+        except Exception:
+            self.get_logger().info('Ignoring an exception occured in the trial run')
+        self.pop_logger_name()
+
+        # Run benchmark iterations
+        self.reset_performance_calculators()
+        self._cpu_profiler.reset()
+        for i in range(self.config.test_iterations):
+            self.get_logger().info(f'Starting Iteration {i+1}')
+            performance_results = self.benchmark_body(play_messages=False)
+            self.print_report(performance_results, sub_heading=f'#{i+1}')
+
+        # Conclude performance measurements from the iteratoins
+        final_perf_results = {}
+        for monitor_info in self.config.monitor_info_list:
+            for calculator in monitor_info.calculators:
+                final_perf_results.update(calculator.conclude_performance())
+        # Conclude CPU profiler data
+        if self.config.enable_cpu_profiler:
+            final_perf_results.update(self._cpu_profiler.conclude_results())
+
+        self.pop_logger_name()
+        return final_perf_results
+
     def run_benchmark_timeline_playback_mode(self) -> dict:
+        """
+        Run benchmarking in timeline mode.
+
+        This benchmark mode plays benchmark messages based on a recorded timeline.
+        """
         self.push_logger_name('Timeline')
         playback_message_count = \
             int(self.config.benchmark_duration * self.config.publisher_upper_frequency)

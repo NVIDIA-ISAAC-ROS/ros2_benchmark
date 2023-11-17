@@ -60,16 +60,26 @@ protected:
     const ros2_benchmark_interfaces::srv::StartMonitoring::Request::SharedPtr,
     ros2_benchmark_interfaces::srv::StartMonitoring::Response::SharedPtr response);
 
+  /// Record a satrt timestamp for a given message key.
+  bool RecordStartTimestamp(
+    const int32_t & message_key,
+    const std::chrono::time_point<std::chrono::system_clock> & timestamp);
+
   /// Record an end timestamp for a given message key.
   bool RecordEndTimestamp(const int32_t & message_key);
 
   /// Record an end timestamp with an automatic generated key.
   bool RecordEndTimestampAutoKey();
 
+  /// Get a timestamp from a given serialized message
+  std::chrono::time_point<std::chrono::system_clock>
+  GetTimestampFromSerializedMessage(
+    std::shared_ptr<rclcpp::SerializedMessage> serialized_message_ptr);
+
   /// Index of this monitor node.
   uint32_t monitor_index_;
 
-  /// The name of the service StartMonitoring created in this nodee
+  /// The name of the service StartMonitoring created in this node
   std::string monitor_service_name_;
 
   /// Data format of the monitor subscriber.
@@ -78,9 +88,18 @@ protected:
   /// Treat the header.stamp.sec field in a message as a message ID.
   bool revise_timestamps_as_message_ids_{false};
 
+  /// Record timestamps in the observed messages as start timestamps
+  bool record_start_timestamps_{false};
+
   /// A subscriber that monitors the incoming messages for a specified topic
   /// and record their arrival timestamps.
   std::shared_ptr<rclcpp::SubscriptionBase> monitor_sub_{nullptr};
+
+  std::mutex is_monitoring_mutex_;
+  bool is_monitoring_;
+
+  /// A list for storing start timestamps obtained from the observed messages.
+  KeyTimePtMap start_timestamps_{};
 
   /// A list for storing timestamps of the observed messages.
   KeyTimePtMap end_timestamps_{};
