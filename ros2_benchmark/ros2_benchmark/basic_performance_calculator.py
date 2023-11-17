@@ -215,4 +215,6 @@ class BasicPerformanceCalculator():
                 final_perf_data[metric] = 'INVALID VALUES: NO CONCLUDED METHOD ASSIGNED'
 
         self.reset()
+        if self._report_prefix != '':
+            return {self._report_prefix: final_perf_data}
         return final_perf_data
