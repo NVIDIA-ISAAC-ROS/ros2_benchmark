@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-# Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,15 +30,6 @@ bool revise_timestamps_as_message_ids false
 # Whether to record timestamps in the incoming messages as start timestamps
 bool record_start_timestamps false
 
-# The maximum time, in seconds, to wait for receiving all expected
-# messages.
-int64 timeout
-
 ---
 
-# A list of message key-timestamp pairs for when the messages are published.
-# Empty if record_start_timestamps is false.
-TimestampedMessageArray start_timestamps
-
-# A list of message key-timestamp pairs for when the messages are received
-TimestampedMessageArray end_timestamps
+# No response fields

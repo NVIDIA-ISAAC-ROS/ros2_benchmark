@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-# Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -52,6 +52,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   srv/SetData.srv
   srv/StartLoading.srv
   srv/StartMonitoring.srv
+  srv/StopMonitoring.srv
   srv/StartRecording.srv
   srv/StopLoading.srv
   srv/StopRecording.srv

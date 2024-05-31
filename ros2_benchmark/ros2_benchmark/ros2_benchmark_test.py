@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-# Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,24 +33,26 @@ from launch.actions import OpaqueFunction
 import launch_testing.actions
 
 import rclpy
-
 from ros2_benchmark_interfaces.srv import GetTopicMessageTimestamps, PlayMessages
 from ros2_benchmark_interfaces.srv import SetData, StartLoading, StopLoading
-from ros2_benchmark_interfaces.srv import StartMonitoring, StartRecording
-
+from ros2_benchmark_interfaces.srv import StartMonitoring, StartRecording, StopMonitoring
 import rosbag2_py
+import yaml
 
 from .basic_performance_calculator import BasicPerformanceMetrics
 from .ros2_benchmark_config import BenchmarkMode
 from .ros2_benchmark_config import ROS2BenchmarkConfig
 from .utils.cpu_profiler import CPUProfiler
 from .utils.nsys_utility import NsysUtility
+from .utils.resource_metrics import ResourceMetrics
 from .utils.ros2_utility import ClientUtility
+from .utils.tegrastats_profiler import TegrastatsProfiler
 
 
 # The maximum allowed line width of a performance repeort displayed in the terminal
 MAX_REPORT_OUTPUT_WIDTH = 90
-idle_cpu_util = 0.0
+idle_cpu_util = None
+idle_gpu_util = None
 
 
 class BenchmarkMetadata(Enum):
@@ -70,6 +72,7 @@ class BenchmarkMetadata(Enum):
     INPUT_DATA_END_TIME = 'Input Data End Time (s)'
     DATA_RESOLUTION = 'Data Resolution'
     IDLE_CPU_UTIL = 'Idle System CPU Util. (%)'
+    IDLE_GPU_UTIL = 'Idle GPU Util. (%)'
     PEAK_THROUGHPUT_PREDICTION = 'Peak Throughput Prediction (Hz)'
     CONFIG = 'Test Configurations'
 
@@ -99,8 +102,27 @@ class ROS2BenchmarkTest(unittest.TestCase):
         # Override default configs from env variablees
         self.override_config_from_env()
 
-        self._cpu_profiler = CPUProfiler()
-        self._cpu_profiler_log_file_path = ''
+        if self.config.log_file_name == '':
+            timestr = self._test_datetime.strftime('%Y%m%d-%H%M%S')
+            self._log_file_path = os.path.join(
+                self.config.log_folder, f'r2b-log-{timestr}')
+        else:
+            if os.path.splitext(self.config.log_file_name)[-1] == '.json':
+                log_file_name = self.config.log_file_name[:-len('.json')]
+            else:
+                log_file_name = self.config.log_file_name
+            self._log_file_path = os.path.join(
+                self.config.log_folder, log_file_name)
+
+        self._monitor_raw_data_export = {}
+        self._monitor_raw_data_export['benchmark_name'] = self.config.benchmark_name
+
+        try:
+            self._resource_profiler = TegrastatsProfiler()
+            rclpy.logging.get_logger('r2b').info('Use tegrastats resource profiler')
+        except FileNotFoundError:
+            self._resource_profiler = CPUProfiler()
+            rclpy.logging.get_logger('r2b').info('Use CPU profiler')
 
         super().__init__(*args, **kwargs)
 
@@ -153,6 +175,31 @@ class ROS2BenchmarkTest(unittest.TestCase):
             filter(None, [cls.config.benchmark_namespace, *tokens]))
 
     @staticmethod
+    def set_idle_resource_utilization():
+        # Wait until the system CPU usage become stable
+        rclpy.logging.get_logger('r2b').info(
+            'Wait 10 seconds for probing idle system resource utilization')
+        time.sleep(10)
+        global idle_cpu_util
+        global idle_gpu_util
+        try:
+            resource_profiler = TegrastatsProfiler()
+            rclpy.logging.get_logger('r2b').info('Probing with tegrastats resource profiler...')
+        except FileNotFoundError:
+            resource_profiler = CPUProfiler()
+            rclpy.logging.get_logger('r2b').info('Probing with CPU profiler...')
+        current_usage = resource_profiler.get_current_usage()
+
+        if ResourceMetrics.MEAN_OVERALL_CPU_UTILIZATION in current_usage:
+            idle_cpu_util = current_usage[ResourceMetrics.MEAN_OVERALL_CPU_UTILIZATION]
+            rclpy.logging.get_logger('r2b').info(
+                '  - Idle system CPU utilization = {:.3f}%'.format(idle_cpu_util))
+        if ResourceMetrics.MEAN_DEVICE_UTILIZATION in current_usage:
+            idle_gpu_util = current_usage[ResourceMetrics.MEAN_DEVICE_UTILIZATION]
+            rclpy.logging.get_logger('r2b').info(
+                '  - Idle system device utilization = {:.3f}%'.format(idle_gpu_util))
+
+    @staticmethod
     def generate_test_description(
         nodes: Iterable[launch.Action], node_startup_delay: float = 5.0
     ) -> launch.LaunchDescription:
@@ -176,13 +223,7 @@ class ROS2BenchmarkTest(unittest.TestCase):
             The LaunchDescription object to launch before running the test
 
         """
-        # Wait until the system CPU usage become stable
-        rclpy.logging.get_logger('r2b').info(
-            'Waiting 10 seconds for measuring idle system CPU utilization...')
-        time.sleep(10)
-        global idle_cpu_util
-        idle_cpu_util = CPUProfiler.get_current_cpu_usage()
-
+        ROS2BenchmarkTest.set_idle_resource_utilization()
         return launch.LaunchDescription(
             nodes + [
                 # Start tests after a fixed delay for node startup
@@ -196,16 +237,30 @@ class ROS2BenchmarkTest(unittest.TestCase):
         launch_setup, node_startup_delay: float = 5.0
     ) -> launch.LaunchDescription:
         """Generate a test launch description with the nsys capability built in."""
-        # Wait until the system CPU usage become stable
-        rclpy.logging.get_logger('r2b').info(
-            'Waiting 10 seconds for measuring idle system CPU utilization...')
-        time.sleep(10)
-        global idle_cpu_util
-        idle_cpu_util = CPUProfiler.get_current_cpu_usage()
-
+        ROS2BenchmarkTest.set_idle_resource_utilization()
         launch_args = NsysUtility.generate_launch_args()
         bound_launch_setup = partial(
             NsysUtility.launch_setup_wrapper,
+            launch_setup=launch_setup)
+        nodes = launch_args + [OpaqueFunction(function=bound_launch_setup)]
+        return launch.LaunchDescription(
+            nodes + [
+                # Start tests after a fixed delay for node startup
+                launch.actions.TimerAction(
+                    period=node_startup_delay,
+                    actions=[launch_testing.actions.ReadyToTest()])
+            ]
+        )
+
+    @staticmethod
+    def generate_test_description_with_nsys_context(
+        launch_setup, node_startup_delay: float = 5.0
+    ) -> launch.LaunchDescription:
+        """Generate a test launch description with the nsys capability built in."""
+        ROS2BenchmarkTest.set_idle_resource_utilization()
+        launch_args = NsysUtility.generate_launch_args()
+        bound_launch_setup = partial(
+            NsysUtility.launch_setup_wrapper_with_context,
             launch_setup=launch_setup)
         nodes = launch_args + [OpaqueFunction(function=bound_launch_setup)]
         return launch.LaunchDescription(
@@ -269,8 +324,11 @@ class ROS2BenchmarkTest(unittest.TestCase):
         """Construct the absolute path of the input data file from configurations."""
         return os.path.join(self.config.assets_root, self.config.input_data_path)
 
-    def print_report(self, report: dict, sub_heading: str = '') -> None:
+    def print_report(self, report: dict, sub_heading: str = '', print_func=None) -> None:
         """Print the given report."""
+        if print_func is None:
+            print_func = self.get_logger().info
+
         heading = self.config.benchmark_name
 
         # Temporarily remove configs from the report as we don't want it to be printed
@@ -316,16 +374,16 @@ class ROS2BenchmarkTest(unittest.TestCase):
         max_row_width = min(max_row_width, MAX_REPORT_OUTPUT_WIDTH)
 
         def print_line_helper():
-            self.get_logger().info('+-{}-+'.format('-'*max_row_width))
+            print_func('+-{}-+'.format('-'*max_row_width))
 
         def print_row_helper(row):
-            self.get_logger().info('| {:<{width}} |'.format(row, width=max_row_width))
+            print_func('| {:<{width}} |'.format(row, width=max_row_width))
 
         def print_table_helper():
             print_line_helper()
-            self.get_logger().info('| {:^{width}} |'.format(heading, width=max_row_width))
+            print_func('| {:^{width}} |'.format(heading, width=max_row_width))
             if sub_heading:
-                self.get_logger().info('| {:^{width}} |'.format(sub_heading, width=max_row_width))
+                print_func('| {:^{width}} |'.format(sub_heading, width=max_row_width))
             print_line_helper()
             for rows in table_blocks:
                 for row in rows:
@@ -360,11 +418,17 @@ class ROS2BenchmarkTest(unittest.TestCase):
         metadata[BenchmarkMetadata.DEVICE_OS] = \
             f'{uname.system} {uname.release} {uname.version}'
         metadata[BenchmarkMetadata.CONFIG] = self.config.to_yaml_str()
-        metadata[BenchmarkMetadata.IDLE_CPU_UTIL] = idle_cpu_util
+        global idle_cpu_util
+        global idle_gpu_util
+        if idle_cpu_util is not None:
+            metadata[BenchmarkMetadata.IDLE_CPU_UTIL] = idle_cpu_util
+        if idle_gpu_util is not None:
+            metadata[BenchmarkMetadata.IDLE_GPU_UTIL] = idle_gpu_util
 
         # Benchmark data info
         metadata[BenchmarkMetadata.BENCHMARK_MODE] = self.config.benchmark_mode.value
-        if self.config.benchmark_mode in [BenchmarkMode.LOOPING, BenchmarkMode.SWEEPING]:
+        if self.config.benchmark_mode in [BenchmarkMode.LOOPING, BenchmarkMode.SWEEPING] and \
+           self._peak_throughput_prediction:
             metadata[BenchmarkMetadata.PEAK_THROUGHPUT_PREDICTION] = \
                 self._peak_throughput_prediction
         if self.config.input_data_path:
@@ -400,12 +464,7 @@ class ROS2BenchmarkTest(unittest.TestCase):
                         data_out[str(key)] = str(value)
             return data_out
 
-        if self.config.log_file_name == '':
-            timestr = self._test_datetime.strftime('%Y%m%d-%H%M%S')
-            log_file_path = os.path.join(self.config.log_folder, f'r2b-log-{timestr}.json')
-        else:
-            log_file_path = os.path.join(self.config.log_folder, self.config.log_file_name)
-
+        log_file_path = self._log_file_path + '.json'
         with open(log_file_path, 'a') as f:
             f.write(json.dumps(to_json_compatible_helper(report)))
         self.get_logger().info(f'Exported benchmark report to {log_file_path}')
@@ -444,7 +503,7 @@ class ROS2BenchmarkTest(unittest.TestCase):
         input_data_path = self.get_input_data_absolute_path()
         try:
             rosbag_info = rosbag2_py.Info()
-            rosbag_metadata = rosbag_info.read_metadata(input_data_path, 'sqlite3')
+            rosbag_metadata = rosbag_info.read_metadata(input_data_path, '')
             rosbag_file_path = input_data_path
             if len(rosbag_metadata.files) > 0:
                 rosbag_file_path = os.path.join(input_data_path, rosbag_metadata.files[0].path)
@@ -453,6 +512,7 @@ class ROS2BenchmarkTest(unittest.TestCase):
                     input_data_path, rosbag_metadata.relative_file_paths[0])
             self.get_logger().info('Checking input data file...')
             self.get_logger().info(f' - Rosbag path = {rosbag_file_path}')
+            self.get_logger().info(f' - Storage ID = {rosbag_metadata.storage_identifier}')
             if rosbag_metadata.compression_mode:
                 self.get_logger().info(
                     f' - Compression mode = {rosbag_metadata.compression_mode}')
@@ -614,24 +674,24 @@ class ROS2BenchmarkTest(unittest.TestCase):
                 PlayMessages, 'play_messages')
 
         # Create and send monitor service requests
-        monitor_service_client_map = {}
-        monitor_service_future_map = {}
+        self.get_logger().info('Requesting to monitor messages.')
         for monitor_info in self.config.monitor_info_list:
-            # Create a monitor service client
+            # Create a start_monitoring service client
             start_monitoring_client = self.create_service_client_blocking(
-                StartMonitoring, monitor_info.service_name)
+                StartMonitoring, monitor_info.service_name + '_start_monitoring')
             if start_monitoring_client is None:
-                return
+                error_message = 'Failed to create a start_monitoring client for ' + \
+                    monitor_info.service_name
+                self.get_logger().error(error_message)
+                raise RuntimeError(error_message)
 
             # Start monitoring messages
-            self.get_logger().info(
-                f'Requesting to monitor end messages from service "{monitor_info.service_name}".')
+            self.get_logger().debug(
+                f'Requesting to monitor messages from service "{monitor_info.service_name}".')
             start_monitoring_request = StartMonitoring.Request()
             if not play_messages:
-                start_monitoring_request.timeout = int(self.config.benchmark_duration)
                 start_monitoring_request.message_count = 0
             else:
-                start_monitoring_request.timeout = self.config.start_monitoring_service_timeout_sec
                 start_monitoring_request.message_count = playback_message_count
             start_monitoring_request.revise_timestamps_as_message_ids = \
                 self.config.revise_timestamps_as_message_ids
@@ -639,15 +699,14 @@ class ROS2BenchmarkTest(unittest.TestCase):
                 self.config.collect_start_timestamps_from_monitors
             start_monitoring_future = start_monitoring_client.call_async(
                 start_monitoring_request)
+            self.get_service_response_from_future_blocking(
+                start_monitoring_future, check_success=False)
 
-            monitor_service_client_map[monitor_info.service_name] = start_monitoring_client
-            monitor_service_future_map[monitor_info.service_name] = start_monitoring_future
-
-        # Start CPU profiler
-        if self.config.enable_cpu_profiler:
-            self._cpu_profiler.stop_profiling()
-            self._cpu_profiler.start_profiling(self.config.cpu_profiling_interval_sec)
-            self.get_logger().info('CPU profiling stared.')
+        # Start resource profiler
+        if self.config.enable_resource_profiler:
+            self._resource_profiler.stop_profiling()
+            self._resource_profiler.start_profiling(self.config.resource_profiling_interval_sec)
+            self.get_logger().info('Resource profiling started.')
 
         playback_start_timestamps = {}
         if play_messages:
@@ -679,16 +738,47 @@ class ROS2BenchmarkTest(unittest.TestCase):
                 f'Running live benchmarking for {self.config.benchmark_duration} seconds...')
             time.sleep(int(self.config.benchmark_duration))
 
+        if play_messages and self.config.pre_stop_monitoring_wait_time_sec > 0.0:
+            print('Wait {} seconds before stoping the monitors'.format(
+                self.config.pre_stop_monitoring_wait_time_sec))
+            time.sleep(self.config.pre_stop_monitoring_wait_time_sec)
+
+        # Stop resource profiler
+        if self.config.enable_resource_profiler:
+            self._resource_profiler.stop_profiling()
+            self.get_logger().info('Resource profiling stopped.')
+
+        # Stop all monitor nodes
+        self.get_logger().info('Requesting to stop monitoring messages.')
+        stop_monitor_service_future_map = {}
+        for monitor_info in self.config.monitor_info_list:
+            # Create a stop_monitoring service client
+            stop_monitoring_client = self.create_service_client_blocking(
+                StopMonitoring, monitor_info.service_name + '_stop_monitoring')
+            if start_monitoring_client is None:
+                error_message = 'Failed to create a stop_monitoring client for ' + \
+                    monitor_info.service_name
+                self.get_logger().error(error_message)
+                raise RuntimeError(error_message)
+
+            # Stop monitoring messages
+            self.get_logger().debug('Requesting to stop monitoring messages from service ' +
+                                    monitor_info.service_name)
+            stop_monitoring_request = StopMonitoring.Request()
+            stop_monitoring_future = stop_monitoring_client.call_async(stop_monitoring_request)
+            stop_monitor_service_future_map[monitor_info.service_name] = stop_monitoring_future
+
         # Get end timestamps from all monitors
         monitor_start_timestamps_map = {}
         monitor_end_timestamps_map = {}
+        monitor_raw_data_list = []
         for monitor_info in self.config.monitor_info_list:
-            self.get_logger().info(
-                f'Waiting for the monitor service "{monitor_info.service_name}" to finish.')
             monitor_response = self.get_service_response_from_future_blocking(
-                monitor_service_future_map[monitor_info.service_name])
+                stop_monitor_service_future_map[monitor_info.service_name])
             start_timestamps_from_monitor = {}
             end_timestamps = {}
+            largest_start_timestamp = 0
+            out_of_order_start_timestamp_count = 0
             for i in range(len(monitor_response.end_timestamps.keys)):
                 key = monitor_response.end_timestamps.keys[i]
                 end_timestamp = monitor_response.end_timestamps.timestamps_ns[i]
@@ -696,18 +786,44 @@ class ROS2BenchmarkTest(unittest.TestCase):
                 if self.config.collect_start_timestamps_from_monitors:
                     start_timestamp = monitor_response.start_timestamps.timestamps_ns[i]
                     start_timestamps_from_monitor[key] = start_timestamp
+                    if start_timestamp > largest_start_timestamp:
+                        largest_start_timestamp = start_timestamp
+                    else:
+                        out_of_order_start_timestamp_count += 1
+            if out_of_order_start_timestamp_count > 0:
+                self.get_logger().warn(f'{out_of_order_start_timestamp_count}/'
+                                       f'{len(monitor_response.end_timestamps.keys)} '
+                                       'out of order start timestamps were detected in '
+                                       f'monitor {monitor_info.service_name}.')
             if self.config.collect_start_timestamps_from_monitors:
                 monitor_start_timestamps_map[monitor_info.service_name] = \
                     start_timestamps_from_monitor
-            else:
+            elif play_messages:
                 monitor_start_timestamps_map[monitor_info.service_name] = \
                     playback_start_timestamps
+            else:
+                monitor_start_timestamps_map[monitor_info.service_name] = []
             monitor_end_timestamps_map[monitor_info.service_name] = end_timestamps
 
-        # Stop CPU profiler
-        if self.config.enable_cpu_profiler:
-            self._cpu_profiler.stop_profiling()
-            self.get_logger().info('CPU profiling stopped.')
+            # Save raw data if needed
+            if self.config.export_monitor_raw_data:
+                monitor_raw_data = {}
+                monitor_raw_data['service_name'] = monitor_info.service_name
+                if self.config.collect_start_timestamps_from_monitors:
+                    monitor_raw_data['start_timestamps'] = {}
+                    monitor_raw_data['start_timestamps']['keys'] = \
+                        list(monitor_response.start_timestamps.keys)
+                    monitor_raw_data['start_timestamps']['timestamps_ns'] = \
+                        list(monitor_response.start_timestamps.timestamps_ns)
+                monitor_raw_data['end_timestamps'] = {}
+                monitor_raw_data['end_timestamps']['keys'] = \
+                    list(monitor_response.end_timestamps.keys)
+                monitor_raw_data['end_timestamps']['timestamps_ns'] = \
+                    list(monitor_response.end_timestamps.timestamps_ns)
+                monitor_raw_data_list.append(monitor_raw_data)
+
+        if self.config.export_monitor_raw_data:
+            self.add_monitor_raw_data_list(monitor_raw_data_list)
 
         # Calculate performance results
         performance_results = {}
@@ -723,9 +839,9 @@ class ROS2BenchmarkTest(unittest.TestCase):
                 performance_results.update(
                     calculator.calculate_performance(start_timestamps, end_timestamps))
 
-        # Add CPU profiler results
-        if self.config.enable_cpu_profiler:
-            performance_results.update(self._cpu_profiler.get_results())
+        # Add resource profiler results
+        if self.config.enable_resource_profiler:
+            performance_results.update(self._resource_profiler.get_results())
 
         return performance_results
 
@@ -752,6 +868,10 @@ class ROS2BenchmarkTest(unittest.TestCase):
         current_lower_freq = self.config.publisher_lower_frequency
 
         # Run a trial run to warm up the graph
+        if self.config.pre_trial_run_wait_time_sec > 0.0:
+            print('Wait {} seconds before starting the trial run'.format(
+                self.config.pre_trial_run_wait_time_sec))
+            time.sleep(self.config.pre_trial_run_wait_time_sec)
         try:
             probe_freq = (current_upper_freq + current_lower_freq) / 2
             message_count = ceil(
@@ -769,6 +889,11 @@ class ROS2BenchmarkTest(unittest.TestCase):
         finally:
             self.get_logger().info(
                 f'Finished the first trial probe at {probe_freq} Hz')
+
+        if self.config.post_trial_run_wait_time_sec > 0.0:
+            print('Wait {} seconds before starting the main benchmarks'.format(
+                self.config.post_trial_run_wait_time_sec))
+            time.sleep(self.config.post_trial_run_wait_time_sec)
 
         # Continue binary search until the search window is small enough to justify a linear scan
         while (
@@ -907,7 +1032,13 @@ class ROS2BenchmarkTest(unittest.TestCase):
 
         final_report = self.construct_final_report(perf_results)
         self.print_report(final_report, sub_heading='Final Report')
+        print('\r\n')
+        self.print_report(final_report, sub_heading='Final Report', print_func=print)
+        print('\r\n')
         self.export_report(final_report)
+
+        if self.config.export_monitor_raw_data:
+            self.export_monitor_raw_data()
 
     def run_benchmark_live_mode(self) -> dict:
         """
@@ -920,6 +1051,10 @@ class ROS2BenchmarkTest(unittest.TestCase):
 
         # Run trial round
         self.push_logger_name('Trial')
+        if self.config.pre_trial_run_wait_time_sec > 0.0:
+            print('Wait {} seconds before starting the trial run'.format(
+                self.config.pre_trial_run_wait_time_sec))
+            time.sleep(self.config.pre_trial_run_wait_time_sec)
         try:
             performance_results = self.benchmark_body(play_messages=False)
             self.print_report(performance_results, sub_heading='Trial')
@@ -927,9 +1062,14 @@ class ROS2BenchmarkTest(unittest.TestCase):
             self.get_logger().info('Ignoring an exception occured in the trial run')
         self.pop_logger_name()
 
+        if self.config.post_trial_run_wait_time_sec > 0.0:
+            print('Wait {} seconds before starting the main iterations'.format(
+                self.config.post_trial_run_wait_time_sec))
+            time.sleep(self.config.post_trial_run_wait_time_sec)
+
         # Run benchmark iterations
         self.reset_performance_calculators()
-        self._cpu_profiler.reset()
+        self._resource_profiler.reset()
         for i in range(self.config.test_iterations):
             self.get_logger().info(f'Starting Iteration {i+1}')
             performance_results = self.benchmark_body(play_messages=False)
@@ -940,9 +1080,9 @@ class ROS2BenchmarkTest(unittest.TestCase):
         for monitor_info in self.config.monitor_info_list:
             for calculator in monitor_info.calculators:
                 final_perf_results.update(calculator.conclude_performance())
-        # Conclude CPU profiler data
-        if self.config.enable_cpu_profiler:
-            final_perf_results.update(self._cpu_profiler.conclude_results())
+        # Conclude resource profiler data
+        if self.config.enable_resource_profiler:
+            final_perf_results.update(self._resource_profiler.conclude_results())
 
         self.pop_logger_name()
         return final_perf_results
@@ -971,19 +1111,25 @@ class ROS2BenchmarkTest(unittest.TestCase):
         """
         self.push_logger_name('Looping')
 
-        # Run Autotuner
-        self.get_logger().info('Running autotuner')
-        target_freq = self.determine_max_sustainable_framerate(self.benchmark_body)
-        self._peak_throughput_prediction = target_freq
-        self.get_logger().info(
-            'Finished autotuning. '
-            f'Running full-scale benchmark for predicted peak frame rate: {target_freq}')
+        if self.config.publisher_upper_frequency == self.config.publisher_lower_frequency:
+            self.get_logger().info('Running benchmarks with fixed frame rate at '
+                                   f'{str(self.config.publisher_upper_frequency)} Hz')
+            target_freq = self.config.publisher_upper_frequency
+            self._peak_throughput_prediction = None
+        else:
+            # Run Autotuner
+            self.get_logger().info('Running autotuner')
+            target_freq = self.determine_max_sustainable_framerate(self.benchmark_body)
+            self._peak_throughput_prediction = target_freq
+            self.get_logger().info(
+                'Finished autotuning. '
+                f'Running full-scale benchmark for predicted peak frame rate: {target_freq}')
 
         playback_message_count = int(self.config.benchmark_duration * target_freq)
 
         # Run benchmark iterations
         self.reset_performance_calculators()
-        self._cpu_profiler.reset()
+        self._resource_profiler.reset()
         for i in range(self.config.test_iterations):
             self.get_logger().info(f'Starting Iteration {i+1}')
             performance_results = self.benchmark_body(
@@ -996,38 +1142,39 @@ class ROS2BenchmarkTest(unittest.TestCase):
         for monitor_info in self.config.monitor_info_list:
             for calculator in monitor_info.calculators:
                 final_perf_results.update(calculator.conclude_performance())
-        # Conclude CPU profiler data
-        if self.config.enable_cpu_profiler:
-            final_perf_results.update(self._cpu_profiler.conclude_results())
+        # Conclude resource profiler data
+        if self.config.enable_resource_profiler:
+            final_perf_results.update(self._resource_profiler.conclude_results())
 
         # Run additional fixed rate test
         self.push_logger_name('FixedRate')
         additional_test_fixed_publisher_rates = \
             set(self.config.additional_fixed_publisher_rate_tests)
-        self.get_logger().info(
-            'Starting fixed publisher rate tests for: '
-            f'{additional_test_fixed_publisher_rates}')
-        for target_freq in additional_test_fixed_publisher_rates:
-            first_monitor_perf = self.get_performance_results_of_first_monitor_calculator(
-                final_perf_results)
-            mean_pub_fps = first_monitor_perf[BasicPerformanceMetrics.MEAN_PLAYBACK_FRAME_RATE]
-            if mean_pub_fps*1.05 < target_freq:
-                self.get_logger().info(
-                    f'Skipped testing the fixed publisher rate for {target_freq}fps '
-                    'as it is higher than the previously measured max sustainable '
-                    f'rate: {mean_pub_fps}')
-                continue
+        if len(additional_test_fixed_publisher_rates) > 0:
             self.get_logger().info(
-                f'Testing fixed publisher rate at {target_freq}fps')
-            playback_message_count = int(self.config.benchmark_duration * target_freq)
-            performance_results = self.benchmark_body(
-                playback_message_count,
-                target_freq)
-            self.print_report(performance_results, sub_heading=f'Fixed {target_freq} FPS')
+                'Starting fixed publisher rate tests for: '
+                f'{additional_test_fixed_publisher_rates}')
+            for target_freq in additional_test_fixed_publisher_rates:
+                first_monitor_perf = self.get_performance_results_of_first_monitor_calculator(
+                    final_perf_results)
+                mean_pub_fps = first_monitor_perf[
+                    BasicPerformanceMetrics.MEAN_PLAYBACK_FRAME_RATE]
+                if mean_pub_fps*1.05 < target_freq:
+                    self.get_logger().info(
+                        f'Skipped testing the fixed publisher rate for {target_freq}fps '
+                        'as it is higher than the previously measured max sustainable '
+                        f'rate: {mean_pub_fps}')
+                    continue
+                self.get_logger().info(
+                    f'Testing fixed publisher rate at {target_freq}fps')
+                playback_message_count = int(self.config.benchmark_duration * target_freq)
+                performance_results = self.benchmark_body(
+                    playback_message_count,
+                    target_freq)
+                self.print_report(performance_results, sub_heading=f'Fixed {target_freq} FPS')
 
-            # Add the test result to the output metrics
-            final_perf_results[f'{target_freq}fps'] = performance_results
-
+                # Add the test result to the output metrics
+                final_perf_results[f'{target_freq}fps'] = performance_results
         self.pop_logger_name()
         return final_perf_results
 
@@ -1043,3 +1190,16 @@ class ROS2BenchmarkTest(unittest.TestCase):
         for monitor_info in self.config.monitor_info_list:
             for calculator in monitor_info.calculators:
                 calculator.reset()
+
+    def add_monitor_raw_data_list(self, monitor_raw_data_list):
+        """Add raw data observed from monitors."""
+        if 'raw_data' not in self._monitor_raw_data_export:
+            self._monitor_raw_data_export['raw_data'] = []
+        self._monitor_raw_data_export['raw_data'].append(monitor_raw_data_list)
+
+    def export_monitor_raw_data(self) -> None:
+        """Export raw data observed from monitors."""
+        log_file_path = self._log_file_path + '-monitor-raw-data.yaml'
+        with open(log_file_path, 'a') as f:
+            yaml.dump(self._monitor_raw_data_export, f)
+        self.get_logger().info(f'Exported monitor raw data to {log_file_path}')

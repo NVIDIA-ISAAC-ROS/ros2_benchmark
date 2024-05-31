@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-# Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,6 +21,8 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 import os
 
+import rclpy
+
 
 class Profiler(ABC):
     """Profiler base class to measure the performance of benchmark tests."""
@@ -31,11 +33,22 @@ class Profiler(ABC):
     def __init__(self):
         """Construct profiler."""
         self._is_running = False
+        self._logger = None
 
         # Logfile path is generated once start_profiling() is called
         self._log_file_path = None
 
         self._profile_data_list = []
+
+    def set_logger(self, logger):
+        """Set logger that enables to print log messages."""
+        self._logger = logger
+
+    def get_logger(self):
+        """Get logger for printing log messages."""
+        if self._logger is not None:
+            return self._logger
+        return rclpy.logging.get_logger(self.__class__.__name__)
 
     @abstractmethod
     def start_profiling(self, log_dir=DEFAILT_LOG_DIR) -> None:

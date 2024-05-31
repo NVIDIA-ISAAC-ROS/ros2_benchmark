@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-# Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -81,8 +81,6 @@ class BasicPerformanceCalculator():
                               end_timestamps_ns: dict) -> dict:
         """Calculate performance based on message start and end timestamps."""
         perf_data = {}
-        num_of_frame_sent = len(start_timestamps_ns)
-        num_of_frame_dropped = len(start_timestamps_ns) - len(end_timestamps_ns)
 
         # BasicPerformanceMetrics.RECEIVED_DURATION
         last_end_timestamp_ms = list(end_timestamps_ns.values())[-1] / 10**6
@@ -97,10 +95,15 @@ class BasicPerformanceCalculator():
             sent_duration_ms = last_sent_time_ms - first_sent_time_ms
             perf_data[BasicPerformanceMetrics.MEAN_PLAYBACK_FRAME_RATE] = len(
                 start_timestamps_ns) / (sent_duration_ms / 1000.0)
-        else:
-            self.get_logger().warning(
-                'Could not compute MEAN_PLAYBACK_FRAME_RATE due to insufficient start '
-                f'timestamps received: {len(start_timestamps_ns)} was received')
+
+            perf_data[BasicPerformanceMetrics.FIRST_SENT_RECEIVED_LATENCY] = \
+                first_end_timestamp_ms - first_sent_time_ms
+            perf_data[BasicPerformanceMetrics.LAST_SENT_RECEIVED_LATENCY] = \
+                last_end_timestamp_ms - last_sent_time_ms
+
+            perf_data[BasicPerformanceMetrics.NUM_MISSED_FRAMES] = \
+                len(start_timestamps_ns) - len(end_timestamps_ns)
+            perf_data[BasicPerformanceMetrics.NUM_FRAMES_SENT] = len(start_timestamps_ns)
 
         # BasicPerformanceMetrics.MEAN_FRAME_RATE
         if received_duration_ms > 0:
@@ -114,14 +117,6 @@ class BasicPerformanceCalculator():
                 'This could be caused by insufficient timestamps received: '
                 f'#start_timestamps={len(start_timestamps_ns)} '
                 f'#end_timestamps = {len(end_timestamps_ns)}')
-
-        perf_data[BasicPerformanceMetrics.NUM_MISSED_FRAMES] = num_of_frame_dropped
-        perf_data[BasicPerformanceMetrics.NUM_FRAMES_SENT] = num_of_frame_sent
-
-        perf_data[BasicPerformanceMetrics.FIRST_SENT_RECEIVED_LATENCY] = \
-            first_end_timestamp_ms - first_sent_time_ms
-        perf_data[BasicPerformanceMetrics.LAST_SENT_RECEIVED_LATENCY] = \
-            last_end_timestamp_ms - last_sent_time_ms
 
         if self._message_key_match:
             # Calculate latency between sent and received messages

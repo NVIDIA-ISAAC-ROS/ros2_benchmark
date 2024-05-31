@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-# Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -117,13 +117,13 @@ class TestRealsense2Node(ROS2BenchmarkTest):
         custom_report_info={'data_resolution': IMAGE_RESOLUTION},
         monitor_info_list=[
             MonitorPerformanceCalculatorsInfo(
-                'start_monitoring0',
+                'monitor_node0',
                 [BasicPerformanceCalculator({
                     'report_prefix': 'Left Image',
                     'message_key_match': True
                 })]),
             MonitorPerformanceCalculatorsInfo(
-                'start_monitoring1',
+                'monitor_node1',
                 [BasicPerformanceCalculator({
                     'report_prefix': 'Right Image',
                     'message_key_match': True

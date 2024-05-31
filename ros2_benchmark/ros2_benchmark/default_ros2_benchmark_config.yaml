@@ -1,6 +1,6 @@
 %YAML 1.2
 # SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-# Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -39,8 +39,8 @@ ros2_benchmark_config:
     # Collect start timestamps from the messages observed by monitors
     collect_start_timestamps_from_monitors: false
 
-    # Enable CPU profiling during benchmarking
-    enable_cpu_profiler: true
+    # Enable resource profiling during benchmarking
+    enable_resource_profiler: true
 
     # Enable publishing TF messages when setting data in a data loader node
     publish_tf_messages_in_set_data: false
@@ -57,12 +57,12 @@ ros2_benchmark_config:
     # preparation process
     enable_trial_buffer_preparation: false
 
-    # The interval for probing CPU utilization
-    cpu_profiling_interval_sec: 1
+    # The interval for probing resource utilization
+    resource_profiling_interval_sec: 0.01
 
     # Monitor node configurations
     monitor_info_list:
-      - service_name: "start_monitoring0"
+      - service_name: "monitor_node0"
         calculators:
           - module_name: "ros2_benchmark.basic_performance_calculator"
             class_name: "BasicPerformanceCalculator"
@@ -72,18 +72,26 @@ ros2_benchmark_config:
     # Duration, in seconds, for how long each benchmark should run
     benchmark_duration: 5
 
+
     # Amount of time to wait for a service client to be created
     setup_service_client_timeout_sec: 20
 
     # Amount of time for a service to complete before timing out
     start_recording_service_timeout_sec: 30
-    start_monitoring_service_timeout_sec: 10
 
     # Amount of time to wait for a service future to return
     default_service_future_timeout_sec: 15
     set_data_service_future_timeout_sec: 60
     start_recording_service_future_timeout_sec: 35
     play_messages_service_future_timeout_sec: 15
+
+   # Amount of time to wait before and after trial run before starting test iterations
+    pre_trial_run_wait_time_sec: 0.0
+    post_trial_run_wait_time_sec: 0.0
+
+    # Amount of time to wait before requesting to stop monitoring
+    # This is ignored in the live benchmark mode
+    pre_stop_monitoring_wait_time_sec: 5.0
 
     # The number of test iterations
     test_iterations: 5
@@ -131,6 +139,9 @@ ros2_benchmark_config:
     # The name of the file for exporting benchmark final report in the "log_folder".
     # The file name is automatically generated if not set.
     log_file_name: ""
+
+    # Export monitored raw data in <log_file_name>-monitor-raw-data.yaml when set
+    export_monitor_raw_data: false
 
     # The directory for storing assets
     assets_root: "/workspaces/isaac_ros-dev/src/ros2_benchmark/assets"

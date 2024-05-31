@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-# Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import os
+import time
 import unittest
 
 import launch
@@ -27,7 +28,7 @@ import launch_testing.actions
 import rclpy
 
 from ros2_benchmark.utils.ros2_utility import ClientUtility
-from ros2_benchmark_interfaces.srv import StartMonitoring
+from ros2_benchmark_interfaces.srv import StartMonitoring, StopMonitoring
 
 
 def generate_test_description():
@@ -88,44 +89,79 @@ class TestMonitorNode(unittest.TestCase):
     def test_monitor_node_services(self):
         """Test services hosted in MonitorNode."""
         SERVICE_SETUP_TIMEOUT_SEC = 5
-        SERVICE_TIMEOUT_SEC = 20
         SERVICE_FUTURE_TIMEOUT_SEC = 25
 
         # Create a test ROS node
         rclpy.init()
         node = rclpy.create_node('test_node')
 
-        # Create a start_monitoring0 service client
+        # Create a monitor_node0_start_monitoring service client
         start_monitoring_client0 = ClientUtility.create_service_client_blocking(
-            node, StartMonitoring, 'start_monitoring0', SERVICE_SETUP_TIMEOUT_SEC)
+            node, StartMonitoring, 'monitor_node0_start_monitoring', SERVICE_SETUP_TIMEOUT_SEC)
         self.assertIsNotNone(start_monitoring_client0)
 
-        # Create a start_monitoring1 service client
+        # Create a monitor_node1_start_monitoring service client
         start_monitoring_client1 = ClientUtility.create_service_client_blocking(
-            node, StartMonitoring, 'start_monitoring1', SERVICE_SETUP_TIMEOUT_SEC)
+            node, StartMonitoring, 'monitor_node1_start_monitoring', SERVICE_SETUP_TIMEOUT_SEC)
         self.assertIsNotNone(start_monitoring_client1)
 
-        # Send a request to the start_monitoring0 service
+        # Send a request to the monitor_node0_start_monitoring service
         start_monitoring_request = StartMonitoring.Request()
-        start_monitoring_request.timeout = SERVICE_TIMEOUT_SEC
         start_monitoring_request.message_count = 1
         start_monitoring_future0 = start_monitoring_client0.call_async(
             start_monitoring_request)
 
-        # Send a request to the start_monitoring1 service
+        # Send a request to the monitor_node1_start_monitoring service
         start_monitoring_future1 = start_monitoring_client1.call_async(
             start_monitoring_request)
 
-        # Wait for the response from the start_monitoring0 service
+        # Wait for the response from the monitor_node0_start_monitoring service
         start_monitoring_response0 = ClientUtility.get_service_response_from_future_blocking(
             node, start_monitoring_future0, SERVICE_FUTURE_TIMEOUT_SEC)
         self.assertIsNotNone(start_monitoring_response0)
-        node.get_logger().info('Received response from the start_monitoring0 service:')
+        node.get_logger().info(
+            'Received response from the monitor_node0_start_monitoring service:')
         node.get_logger().info(str(start_monitoring_response0))
 
-        # Wait for the response from the start_monitoring1 service
+        # Wait for the response from the monitor_node1_start_monitoring service
         start_monitoring_response1 = ClientUtility.get_service_response_from_future_blocking(
             node, start_monitoring_future1, SERVICE_FUTURE_TIMEOUT_SEC)
         self.assertIsNotNone(start_monitoring_response1)
-        node.get_logger().info('Received response from the start_monitoring1 service:')
+        node.get_logger().info(
+            'Received response from the monitor_node1_start_monitoring service:')
         node.get_logger().info(str(start_monitoring_response1))
+
+        time.sleep(1)
+
+        # Create a monitor_node0_stop_monitoring service client
+        stop_monitoring_client0 = ClientUtility.create_service_client_blocking(
+            node, StopMonitoring, 'monitor_node0_stop_monitoring', SERVICE_SETUP_TIMEOUT_SEC)
+        self.assertIsNotNone(stop_monitoring_client0)
+
+        # Create a monitor_node1_stop_monitoring service client
+        stop_monitoring_client1 = ClientUtility.create_service_client_blocking(
+            node, StopMonitoring, 'monitor_node1_stop_monitoring', SERVICE_SETUP_TIMEOUT_SEC)
+        self.assertIsNotNone(stop_monitoring_client1)
+
+        # Send a request to the monitor_node0_stop_monitoring service
+        stop_monitoring_request = StopMonitoring.Request()
+        stop_monitoring_future0 = stop_monitoring_client0.call_async(
+            stop_monitoring_request)
+
+        # Send a request to the monitor_node1_stop_monitoring service
+        stop_monitoring_future1 = stop_monitoring_client1.call_async(
+            stop_monitoring_request)
+
+        # Wait for the response from the monitor_node0_stop_monitoring service
+        stop_monitoring_response0 = ClientUtility.get_service_response_from_future_blocking(
+            node, stop_monitoring_future0, SERVICE_FUTURE_TIMEOUT_SEC)
+        self.assertIsNotNone(stop_monitoring_response0)
+        node.get_logger().info('Received response from the monitor_node0_stop_monitoring service:')
+        node.get_logger().info(str(stop_monitoring_response0))
+
+        # Wait for the response from the monitor_node1_stop_monitoring service
+        stop_monitoring_response1 = ClientUtility.get_service_response_from_future_blocking(
+            node, stop_monitoring_future1, SERVICE_FUTURE_TIMEOUT_SEC)
+        self.assertIsNotNone(stop_monitoring_response1)
+        node.get_logger().info('Received response from the monitor_node1_stop_monitoring service:')
+        node.get_logger().info(str(stop_monitoring_response1))
