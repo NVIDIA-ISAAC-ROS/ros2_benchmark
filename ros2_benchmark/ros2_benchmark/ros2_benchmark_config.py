@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-# Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ BUILTIN_ros2_benchmark_CONFIG_FILE = os.path.join(
 
 class MonitorPerformanceCalculatorsInfo:
     def __init__(self,
-                 service_name='start_monitoring0',
+                 service_name='monitor_node0',
                  calculators=[BasicPerformanceCalculator()]) -> None:
         """Initialize a monitor's performance calculators info."""
         self.service_name = service_name
@@ -72,21 +72,23 @@ class ROS2BenchmarkConfig():
     __config_type_map = {
         'revise_timestamps_as_message_ids': bool,
         'collect_start_timestamps_from_monitors': bool,
-        'enable_cpu_profiler': bool,
+        'enable_resource_profiler': bool,
         'publish_tf_messages_in_set_data': bool,
         'publish_tf_static_messages_in_set_data': bool,
         'load_data_in_real_time': bool,
         'record_data_timeline': bool,
         'enable_trial_buffer_preparation': bool,
-        'cpu_profiling_interval_sec': float,
+        'resource_profiling_interval_sec': float,
         'benchmark_duration': float,
         'setup_service_client_timeout_sec': float,
         'start_recording_service_timeout_sec': int,
-        'start_monitoring_service_timeout_sec': int,
         'default_service_future_timeout_sec': float,
         'set_data_service_future_timeout_sec': float,
         'start_recording_service_future_timeout_sec': float,
         'play_messages_service_future_timeout_sec': float,
+        'pre_stop_monitoring_wait_time_sec': float,
+        'pre_trial_run_wait_time_sec': float,
+        'post_trial_run_wait_time_sec': float,
         'test_iterations': int,
         'playback_message_buffer_size': int,
         'publisher_upper_frequency': float,
@@ -100,6 +102,7 @@ class ROS2BenchmarkConfig():
         'linear_scan_duration_fraction': float,
         'linear_scan_acceptable_frame_loss_fraction': float,
         'linear_scan_acceptable_frame_rate_drop': float,
+        'export_monitor_raw_data': bool,
         'input_data_start_time': float,
         'input_data_end_time': float
     }

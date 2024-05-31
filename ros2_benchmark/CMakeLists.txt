@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-# Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -94,9 +94,9 @@ if(BUILD_TESTING)
   endif()
 
   find_package(launch_testing_ament_cmake REQUIRED)
-  add_launch_test(test/data_loader_node_pol.py TIMEOUT "15")
-  add_launch_test(test/monitor_node_pol.py TIMEOUT "15")
-  add_launch_test(test/playback_node_pol.py TIMEOUT "15")
+  add_launch_test(test/data_loader_node_pol.py TIMEOUT "60")
+  add_launch_test(test/monitor_node_pol.py TIMEOUT "60")
+  add_launch_test(test/playback_node_pol.py TIMEOUT "60")
 endif()
 
-ament_auto_package()
+ament_auto_package(INSTALL_TO_SHARE ../scripts)

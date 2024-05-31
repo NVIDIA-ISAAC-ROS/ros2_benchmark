@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-// Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+// http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,9 +18,10 @@
 #ifndef ROS2_BENCHMARK__MONITOR_NODE_HPP_
 #define ROS2_BENCHMARK__MONITOR_NODE_HPP_
 
-#include <map>
 #include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "common.hpp"
 
@@ -28,14 +29,15 @@
 #include "rclcpp/serialization.hpp"
 
 #include "ros2_benchmark_interfaces/srv/start_monitoring.hpp"
+#include "ros2_benchmark_interfaces/srv/stop_monitoring.hpp"
 
 namespace ros2_benchmark
 {
 
 using TimePt = std::chrono::time_point<std::chrono::system_clock>;
-using KeyTimePtMap = std::map<int32_t, TimePt>;
+using KeyTimePtPairVector = std::vector<std::pair<int32_t, TimePt>>;
 
-constexpr char kMonitorNodeServiceBaseName[] = "start_monitoring";
+constexpr char kMonitorNodeServiceBaseName[] = "monitor_node";
 
 class MonitorNode : public rclcpp::Node
 {
@@ -57,8 +59,13 @@ protected:
 
   /// Callback function to start monitoring the incoming messages.
   void StartMonitoringServiceCallback(
-    const ros2_benchmark_interfaces::srv::StartMonitoring::Request::SharedPtr,
-    ros2_benchmark_interfaces::srv::StartMonitoring::Response::SharedPtr response);
+    const ros2_benchmark_interfaces::srv::StartMonitoring::Request::SharedPtr request,
+    ros2_benchmark_interfaces::srv::StartMonitoring::Response::SharedPtr);
+
+  /// Callback function to stop monitoring the incoming messages.
+  void StopMonitoringServiceCallback(
+    const ros2_benchmark_interfaces::srv::StopMonitoring::Request::SharedPtr,
+    ros2_benchmark_interfaces::srv::StopMonitoring::Response::SharedPtr response);
 
   /// Record a satrt timestamp for a given message key.
   bool RecordStartTimestamp(
@@ -96,13 +103,13 @@ protected:
   std::shared_ptr<rclcpp::SubscriptionBase> monitor_sub_{nullptr};
 
   std::mutex is_monitoring_mutex_;
-  bool is_monitoring_;
+  bool is_monitoring_{false};
 
   /// A list for storing start timestamps obtained from the observed messages.
-  KeyTimePtMap start_timestamps_{};
+  KeyTimePtPairVector start_timestamps_{};
 
   /// A list for storing timestamps of the observed messages.
-  KeyTimePtMap end_timestamps_{};
+  KeyTimePtPairVector end_timestamps_{};
 
   /// Callback group for services.
   const rclcpp::CallbackGroup::SharedPtr service_callback_group_;
@@ -110,6 +117,10 @@ protected:
   /// A service object for StartMonitoring.
   rclcpp::Service<ros2_benchmark_interfaces::srv::StartMonitoring>::SharedPtr
     start_monitoring_service_;
+
+  /// A service object for StopMonitoring.
+  rclcpp::Service<ros2_benchmark_interfaces::srv::StopMonitoring>::SharedPtr
+    stop_monitoring_service_;
 };
 
 }  // namespace ros2_benchmark

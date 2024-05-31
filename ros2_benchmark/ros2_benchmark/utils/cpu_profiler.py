@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-# Copyright (c) 2021-2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2021-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 
 """CPU profiler class to measure performance of benchmark tests."""
 
-from enum import Enum
 import numbers
 from pathlib import Path
 from threading import Thread
@@ -26,16 +25,7 @@ import numpy as np
 import psutil
 
 from .profiler import Profiler
-
-
-class CPUProfilingMetrics(Enum):
-    """Metrics for CPU profiling."""
-
-    MAX_CPU_UTIL = 'Max. CPU Util. (%)'
-    MIN_CPU_UTIL = 'Min. CPU Util. (%)'
-    MEAN_CPU_UTIL = 'Mean CPU Util. (%)'
-    STD_DEV_CPU_UTIL = 'Std. Deviation CPU Util. (%)'
-    BASELINE_CPU_UTIL = 'Baseline CPU Util. (%)'
+from .resource_metrics import ResourceMetrics
 
 
 class CPUProfiler(Profiler):
@@ -77,9 +67,12 @@ class CPUProfiler(Profiler):
             self.psutil_thread.join()
 
     @staticmethod
-    def get_current_cpu_usage():
+    def get_current_usage():
         """Return current CPU usage."""
-        return np.mean(psutil.cpu_percent(interval=1.0, percpu=True))
+        profile_data = {}
+        profile_data[ResourceMetrics.MEAN_OVERALL_CPU_UTILIZATION] = \
+            np.mean(psutil.cpu_percent(interval=1.0, percpu=True))
+        return profile_data
 
     def get_results(self, log_file_path=None) -> dict:
         """Return CPU profiling results."""
@@ -97,11 +90,11 @@ class CPUProfiler(Profiler):
                                   for v in line[1:-2].split(',')]))
 
             cpu_values = np.array(cpu_values)
-            profile_data[CPUProfilingMetrics.MAX_CPU_UTIL] = np.max(cpu_values)
-            profile_data[CPUProfilingMetrics.MIN_CPU_UTIL] = np.min(cpu_values)
-            profile_data[CPUProfilingMetrics.MEAN_CPU_UTIL] = np.mean(cpu_values)
-            profile_data[CPUProfilingMetrics.STD_DEV_CPU_UTIL] = np.std(cpu_values)
-            profile_data[CPUProfilingMetrics.BASELINE_CPU_UTIL] = cpu_values[0]
+            profile_data[ResourceMetrics.BASELINE_OVERALL_CPU_UTILIZATION] = cpu_values[0]
+            profile_data[ResourceMetrics.MAX_OVERALL_CPU_UTILIZATION] = np.max(cpu_values)
+            profile_data[ResourceMetrics.MIN_OVERALL_CPU_UTILIZATION] = np.min(cpu_values)
+            profile_data[ResourceMetrics.MEAN_OVERALL_CPU_UTILIZATION] = np.mean(cpu_values)
+            profile_data[ResourceMetrics.STDDEV_OVERALL_CPU_UTILIZATION] = np.std(cpu_values)
 
         self._profile_data_list.append(profile_data)
 
@@ -119,19 +112,19 @@ class CPUProfiler(Profiler):
             return {}
 
         MEAN_METRICS = [
-            CPUProfilingMetrics.MEAN_CPU_UTIL,
-            CPUProfilingMetrics.STD_DEV_CPU_UTIL,
-            CPUProfilingMetrics.BASELINE_CPU_UTIL
+            ResourceMetrics.BASELINE_OVERALL_CPU_UTILIZATION,
+            ResourceMetrics.MEAN_OVERALL_CPU_UTILIZATION,
+            ResourceMetrics.STDDEV_OVERALL_CPU_UTILIZATION,
         ]
         MAX_METRICS = [
-            CPUProfilingMetrics.MAX_CPU_UTIL
+            ResourceMetrics.MAX_OVERALL_CPU_UTILIZATION,
         ]
         MIN_METRICS = [
-            CPUProfilingMetrics.MIN_CPU_UTIL
+            ResourceMetrics.MIN_OVERALL_CPU_UTILIZATION,
         ]
 
         final_profile_data = {}
-        for metric in CPUProfilingMetrics:
+        for metric in ResourceMetrics:
             metric_value_list = [profile_data.get(metric, None) for
                                  profile_data in self._profile_data_list]
             if not all(isinstance(value, numbers.Number) for value in metric_value_list):

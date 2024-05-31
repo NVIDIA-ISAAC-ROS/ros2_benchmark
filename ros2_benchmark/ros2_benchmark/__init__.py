@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-# Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ from .ros2_benchmark_config import BenchmarkMode, MonitorPerformanceCalculatorsI
 from .ros2_benchmark_config import ROS2BenchmarkConfig
 from .ros2_benchmark_test import BenchmarkMetadata, ROS2BenchmarkTest
 from .utils.image_utility import ImageResolution, Resolution
+from .utils.resource_metrics import ResourceMetrics
 
 __all__ = [
     'BasicPerformanceCalculator',
@@ -31,6 +32,7 @@ __all__ = [
     'ImageResolution',
     'MonitorPerformanceCalculatorsInfo',
     'Resolution',
+    'ResourceMetrics',
     'ROS2BenchmarkConfig',
     'ROS2BenchmarkTest',
 ]

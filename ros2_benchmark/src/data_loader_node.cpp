@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-// Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+// http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -355,14 +355,22 @@ void DataLoaderNode::OpenRosbagFile()
     throw std::runtime_error(error_msg.str().c_str());
   }
 
+  // Open with default option to get the storage type (from storage_id in metadata)
+  rosbag2_storage::StorageOptions trial_storage_options;
+  trial_storage_options.uri = rosbag_path_;
+  rosbag_reader_.open(trial_storage_options, {});
+
   rosbag2_storage::StorageOptions storage_options;
   storage_options.uri = rosbag_path_;
-  storage_options.storage_id = "sqlite3";
+  storage_options.storage_id = rosbag_reader_.get_metadata().storage_identifier;
+
+  RCLCPP_INFO(get_logger(), "Detected rosbag storage_id = %s", storage_options.storage_id.c_str());
 
   rosbag2_cpp::ConverterOptions converter_options;
   converter_options.input_serialization_format = "cdr";
   converter_options.output_serialization_format = "cdr";
 
+  rosbag_reader_.close();
   rosbag_reader_.open(storage_options, converter_options);
 
   // Check the rosbag's compression formats

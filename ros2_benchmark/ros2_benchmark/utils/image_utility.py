@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-# Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -54,4 +54,5 @@ class ImageResolution:
     WVGA = Resolution(720, 480, 'WVGA')
     HD = Resolution(1280, 720, 'HD')
     FULL_HD = Resolution(1920, 1080, 'Full HD')
+    WUXGA = Resolution(1920, 1200, 'WUXGA')
     FOUR_K = Resolution(3840, 2160, '4K')

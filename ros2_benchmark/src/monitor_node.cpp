@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-// Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+// http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,9 +30,19 @@ MonitorNode::MonitorNode(
   service_callback_group_{create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive)},
   start_monitoring_service_{
     create_service<ros2_benchmark_interfaces::srv::StartMonitoring>(
-      monitor_service_name_,
+      monitor_service_name_ + std::string("_start_monitoring"),
       std::bind(
         &MonitorNode::StartMonitoringServiceCallback,
+        this,
+        std::placeholders::_1,
+        std::placeholders::_2),
+      rmw_qos_profile_default,
+      service_callback_group_)},
+  stop_monitoring_service_{
+    create_service<ros2_benchmark_interfaces::srv::StopMonitoring>(
+      monitor_service_name_ + std::string("_stop_monitoring"),
+      std::bind(
+        &MonitorNode::StopMonitoringServiceCallback,
         this,
         std::placeholders::_1,
         std::placeholders::_2),
@@ -135,22 +145,13 @@ bool MonitorNode::RecordStartTimestamp(
   const int32_t & message_key,
   const std::chrono::time_point<std::chrono::system_clock> & timestamp)
 {
-  // If key already exists in start map, return false
-  if (start_timestamps_.count(message_key) > 0) {
-    RCLCPP_ERROR(
-      get_logger(),
-      "[MonitorNode] Message key %d existed when recording a start timestamp",
-      message_key);
-    return false;
-  }
-
   RCLCPP_DEBUG(
     get_logger(),
     "[MonitorNode] Recorded a start timestamp for message key %d",
     message_key);
 
   // Add new entry to start timestamps
-  start_timestamps_.emplace(message_key, timestamp);
+  start_timestamps_.emplace_back(message_key, timestamp);
   return true;
 }
 
@@ -159,22 +160,13 @@ bool MonitorNode::RecordEndTimestamp(const int32_t & message_key)
   // Record timestamp first, in case we need to wait to acquire mutex
   const auto timestamp{std::chrono::system_clock::now()};
 
-  // If key already exists in end map, return false
-  if (end_timestamps_.count(message_key) > 0) {
-    RCLCPP_ERROR(
-      get_logger(),
-      "[MonitorNode] Message key %d existed when recording an end timestamp",
-      message_key);
-    return false;
-  }
-
   RCLCPP_DEBUG(
     get_logger(),
     "[MonitorNode] Recorded an end timestamp for message key %d",
     message_key);
 
   // Add new entry to end timestamps
-  end_timestamps_.emplace(message_key, timestamp);
+  end_timestamps_.emplace_back(message_key, timestamp);
   return true;
 }
 
@@ -185,53 +177,57 @@ bool MonitorNode::RecordEndTimestampAutoKey()
 
 void MonitorNode::StartMonitoringServiceCallback(
   const ros2_benchmark_interfaces::srv::StartMonitoring::Request::SharedPtr request,
-  ros2_benchmark_interfaces::srv::StartMonitoring::Response::SharedPtr response)
+  ros2_benchmark_interfaces::srv::StartMonitoring::Response::SharedPtr)
 {
   RCLCPP_DEBUG(
     get_logger(),
-    "[MonitorNode] Enter monitor node callback");
-
+    "[MonitorNode] Enter monitor node StartMonitoringServiceCallback");
   {
     std::lock_guard<std::mutex> lock(is_monitoring_mutex_);
     revise_timestamps_as_message_ids_ = request->revise_timestamps_as_message_ids;
     record_start_timestamps_ = request->record_start_timestamps;
     is_monitoring_ = true;
   }
+}
+
+void MonitorNode::StopMonitoringServiceCallback(
+  const ros2_benchmark_interfaces::srv::StopMonitoring::Request::SharedPtr,
+  ros2_benchmark_interfaces::srv::StopMonitoring::Response::SharedPtr response)
+{
+  RCLCPP_DEBUG(
+    get_logger(),
+    "[MonitorNode] Enter monitor node StopMonitoringServiceCallback");
+
+  {
+    std::lock_guard<std::mutex> lock(is_monitoring_mutex_);
+    if (is_monitoring_ == false) {
+      RCLCPP_ERROR(
+        get_logger(),
+        "[MonitorNode] Received stop monitoring request while monitor was not started.");
+      return;
+    }
+    is_monitoring_ = false;
+  }
 
   // Initialize message for return
   ros2_benchmark_interfaces::msg::TimestampedMessageArray response_start_timestamps{};
   ros2_benchmark_interfaces::msg::TimestampedMessageArray response_end_timestamps{};
 
-  // Record start time for timeout checking
-  const auto start = std::chrono::system_clock::now();
-
-  // Assume messages keys are unique (may receive stale timestamps)
-  while ((request->message_count == 0 || end_timestamps_.size() < request->message_count) &&
-    ((std::chrono::system_clock::now() - start) < std::chrono::seconds{request->timeout}))
-  {
-    std::this_thread::sleep_for(std::chrono::milliseconds(kThreadDelay));
-  }
-
-  {
-    std::lock_guard<std::mutex> lock(is_monitoring_mutex_);
-    is_monitoring_ = false;
-  }
-
   // Record the keys of each message
-  for (auto it : start_timestamps_) {
-    response_start_timestamps.keys.emplace_back(it.first);
+  for (auto key_time_pair : start_timestamps_) {
+    response_start_timestamps.keys.emplace_back(key_time_pair.first);
     response_start_timestamps.timestamps_ns.emplace_back(
       // Convert to nanoseconds
       std::chrono::duration_cast<std::chrono::nanoseconds>(
-        it.second.time_since_epoch())
+        key_time_pair.second.time_since_epoch())
       .count());
   }
-  for (auto it : end_timestamps_) {
-    response_end_timestamps.keys.emplace_back(it.first);
+  for (auto key_time_pair : end_timestamps_) {
+    response_end_timestamps.keys.emplace_back(key_time_pair.first);
     response_end_timestamps.timestamps_ns.emplace_back(
       // Convert to nanoseconds
       std::chrono::duration_cast<std::chrono::nanoseconds>(
-        it.second.time_since_epoch())
+        key_time_pair.second.time_since_epoch())
       .count());
   }
 

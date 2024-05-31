@@ -33,6 +33,8 @@ The graph under benchmark is measured multiple times, with calculated results in
   - [Supported Platforms](#supported-platforms)
   - [Quickstart](#quickstart)
   - [Datasets](#datasets)
+    - [r2b Dataset 2024](#r2b-dataset-2024)
+    - [r2b Dataset 2023](#r2b-dataset-2023)
   - [Results](#results)
     - [Example Results](#example-results)
     - [Explanation of the Results JSON Format](#explanation-of-the-results-json-format)
@@ -137,26 +139,38 @@ Input data for benchmarking is provided in a rosbag.
 
 To provide consistency of results, we have provided multiple dataset sequences in rosbag for use with `ros2_benchmark`; input data in other rosbag(s) can be used. These dataset sequences were captured on a robot, using very high precision time synchronization between sensors.  Captured sensor data includes [HAWK (2mp RGB stereo camera with IMU)](https://www.leopardimaging.com/li-ar0234cs-stereo-gmsl2-hawk/), [D455](https://www.intelrealsense.com/depth-camera-d455/) and [XT32](https://www.hesaitech.com/product/xt32/).
 
-These datasets are explicitly **not** provided inside this repository. Instead, visit NGC to download the dataset [here](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/isaac/resources/r2bdataset2023).
+These datasets are explicitly **not** provided inside this repository. Instead, visit NGC to download the dataset [here](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/isaac/collections/r2bdataset).
 
-You can also download the dataset with command-line tools as follows by first installing the NGC CLI.
+You can also download the datasets with command-line tools as follows by first installing the NGC CLI.
 
 ```bash
 wget --content-disposition https://ngc.nvidia.com/downloads/ngccli_linux.zip && unzip ngccli_linux.zip && chmod u+x ngc-cli/ngc
 ```
 
-With the NGC CLI available, you can download the dataset with the following commands:
+With the NGC CLI available, you can download the datasets with the following commands:
 
 ```bash
-./ngc-cli/ngc registry resource download-version "nvidia/isaac/r2bdataset2023:2"
+./ngc-cli/ngc registry resource download-version "nvidia/isaac/r2bdataset2023:3"
+./ngc-cli/ngc registry resource download-version "nvidia/isaac/r2bdataset2024:1"
 ```
 
 Then, move the datasets to their required location:
 
 ```bash
-mv r2bdataset2023_v2 assets/datasets/r2b_dataset
+mkdir assets/datasets/r2b_dataset
+mv r2bdataset2023_v3/* assets/datasets/r2b_dataset
+mv r2bdataset2024_v1/* assets/datasets/r2b_dataset
 ```
 
+### r2b Dataset 2024
+| Sequence                                                                                           | Size | Visual                                                                                                                                                                                    | Contents                                                                                                                          | Description                                                                                            |
+| -------------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| [r2b_galileo](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/isaac/resources/r2bdataset2024)     | 471M | <img alt="galileo sequence" src="https://media.githubusercontent.com/media/NVIDIA-ISAAC-ROS/.github/main/resources/isaac_ngc/r2bdataset/r2b_galileo_sequence.gif" width="300px"/>         | 4x LI HAWK stereo <br> L+R 1920x1200 RGB 30fps<br><br> IMU <br> Wheel odometry                                                    | Room sequence including robots, shelving, boxes, pallets, with moving obstacles.                       |
+| [r2b_galileo2](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/isaac/resources/r2bdataset2024)    | 986M | <img alt="galileo2 sequence" src="https://media.githubusercontent.com/media/NVIDIA-ISAAC-ROS/.github/main/resources/isaac_ngc/r2bdataset/r2b_galileo_sequence.gif" width="300px"/>        | RealSense D455 <br> L+R 1280x720 IR Mono 30fps <br> Depth 1280x780 30fps <br> 1280x800 RGB 30fps <br><br> IMU <br> Wheel odometry | Room sequence including robots, shelving, boxes, pallets, with moving obstacles.                       |
+| [r2b_robotarm](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/isaac/resources/r2bdataset2024)    | 1.4G | <img alt="robotarm sequence" src="https://media.githubusercontent.com/media/NVIDIA-ISAAC-ROS/.github/main/resources/isaac_ngc/r2bdataset/r2b_robotarm_sequence.gif" width="300px"/>       | RealSense D455 <br> L+R 1280x720 IR Mono 30fps <br> Depth 1280x780 30fps <br> 1280x800 RGB 30fps <br><br> Robot joint states      | Robot arm sequence containing objects on a tray.                                                       |
+| [r2b_whitetunnel](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/isaac/resources/r2bdataset2024) | 503M | <img alt="whitetunnel sequence" src="https://media.githubusercontent.com/media/NVIDIA-ISAAC-ROS/.github/main/resources/isaac_ngc/r2bdataset/r2b_whitetunnel_sequence.gif" width="300px"/> | 4x LI HAWK stereo <br> L+R 1920x1200 RGB 30fps<br><br> IMU <br> Wheel odometry                                                    | Hallway sequence with low to no feature not-perpendicular walls, specular highlights, and reflections. |
+
+### r2b Dataset 2023
 | Sequence                                                                                          | Size | Visual                                                                                     | Contents                                                                                                                                                                       | Description                                                                                                                                                                                        |
 | ------------------------------------------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [r2b_lounge](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/isaac/resources/r2bdataset2023)     | 3.9G | <img alt="lounge sequence" src="resources/r2b_lounge_sequence.gif" width="300px"/>         | LI HAWK stereo <br> L+R 1920x1200 RGB 30fps<br><br> RealSense D455 <br> L+R 1280x720 Mono IR 30fps <br> Depth 1280x780 30fps <br> 1280x800 RGB 30fps <br> Hesai XT32 10Hz <br> | Lounge sequence containing couch, table, chairs, and staircase with natural planted background wall.                                                                                               |
@@ -413,5 +427,6 @@ Besides benchmarking a graph with data loaded from rosbags, `ros2_benchmark` als
 
 | Date       | Changes                             |
 | ---------- | ----------------------------------- |
+| 2024-05-30 | Include r2b Dataset 2024            |
 | 2023-11-16 | Add support for live benchmark mode |
 | 2023-04-05 | Initial release                     |

@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-# Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,3 +14,17 @@
 # limitations under the License.
 #
 # SPDX-License-Identifier: Apache-2.0
+
+# This service requests a monitor node to stop monitoring a
+# topic's incoming messages.
+
+# No request fields
+
+---
+
+# A list of message key-timestamp pairs for when the messages are published.
+# Empty if record_start_timestamps is false.
+TimestampedMessageArray start_timestamps
+
+# A list of message key-timestamp pairs for when the messages are received
+TimestampedMessageArray end_timestamps

@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-# Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -81,5 +81,25 @@ class NsysUtility():
                 return launch_setup()
         container_sigterm_timeout = '1000' if enable_nsys else '5'
         return launch_setup(
+            container_prefix=container_prefix,
+            container_sigterm_timeout=container_sigterm_timeout)
+
+    @staticmethod
+    def launch_setup_wrapper_with_context(context, launch_setup):
+        """Invoke the launch_setup method with nsys parameters for ComposableNodeContainer."""
+        enable_nsys, container_prefix = NsysUtility.generate_nsys_prefix(context)
+        launch_setup_parameters = signature(launch_setup).parameters
+        if (not all(param in launch_setup_parameters for param in
+                    ['container_prefix', 'container_sigterm_timeout'])):
+            if enable_nsys:
+                raise RuntimeError(
+                    'Incorrect launch_setup signature. '
+                    'When Nsys is enbaled, the signature must be: '
+                    'def launch_setup(container_prefix, container_sigterm_timeout)')
+            else:
+                return launch_setup()
+        container_sigterm_timeout = '1000' if enable_nsys else '5'
+        return launch_setup(
+            context=context,
             container_prefix=container_prefix,
             container_sigterm_timeout=container_sigterm_timeout)
