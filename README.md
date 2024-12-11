@@ -82,7 +82,7 @@ To use and learn to use `ros2_benchmark`, start by running a sample benchmark. F
         git clone https://github.com/christianrauch/apriltag_ros.git && \
     cd $R2B_WS_HOME && \
         sudo apt-get update && \
-        rosdep install -i -r --from-paths src --rosdistro humble -y
+        rosdep update && rosdep install -i -r --from-paths src --rosdistro humble -y
     ```
 
 4. Clone and build `image_proc` package with patch to fix incompatible QoS settings.
@@ -97,7 +97,7 @@ To use and learn to use `ros2_benchmark`, start by running a sample benchmark. F
       git apply resize_qos_profile.patch && \
     cd $R2B_WS_HOME && \
       sudo apt-get update && \
-      rosdep install -i -r --from-paths src --rosdistro humble -y && \
+      rosdep update && rosdep install -i -r --from-paths src --rosdistro humble -y && \
       colcon build --packages-up-to image_proc
     ```
 

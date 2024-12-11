@@ -42,11 +42,11 @@ import yaml
 from .basic_performance_calculator import BasicPerformanceMetrics
 from .ros2_benchmark_config import BenchmarkMode
 from .ros2_benchmark_config import ROS2BenchmarkConfig
-from .utils.cpu_profiler import CPUProfiler
 from .utils.nsys_utility import NsysUtility
 from .utils.resource_metrics import ResourceMetrics
 from .utils.ros2_utility import ClientUtility
 from .utils.tegrastats_profiler import TegrastatsProfiler
+from .utils.x86_profiler import X86Profiler
 
 
 # The maximum allowed line width of a performance repeort displayed in the terminal
@@ -121,8 +121,8 @@ class ROS2BenchmarkTest(unittest.TestCase):
             self._resource_profiler = TegrastatsProfiler()
             rclpy.logging.get_logger('r2b').info('Use tegrastats resource profiler')
         except FileNotFoundError:
-            self._resource_profiler = CPUProfiler()
-            rclpy.logging.get_logger('r2b').info('Use CPU profiler')
+            self._resource_profiler = X86Profiler()
+            rclpy.logging.get_logger('r2b').info('Use x86 resource profiler')
 
         super().__init__(*args, **kwargs)
 
@@ -186,8 +186,8 @@ class ROS2BenchmarkTest(unittest.TestCase):
             resource_profiler = TegrastatsProfiler()
             rclpy.logging.get_logger('r2b').info('Probing with tegrastats resource profiler...')
         except FileNotFoundError:
-            resource_profiler = CPUProfiler()
-            rclpy.logging.get_logger('r2b').info('Probing with CPU profiler...')
+            resource_profiler = X86Profiler()
+            rclpy.logging.get_logger('r2b').info('Probing with x86 profiler...')
         current_usage = resource_profiler.get_current_usage()
 
         if ResourceMetrics.MEAN_OVERALL_CPU_UTILIZATION in current_usage:

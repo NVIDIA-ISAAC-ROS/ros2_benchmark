@@ -34,7 +34,7 @@ class TegrastatsProfiler(Profiler):
     """Tegrastats profiler class to measure CPU and GPU performance of benchmark tests."""
 
     def __init__(self, tegrastats_path='tegrastats'):
-        """Construct CPU profiler."""
+        """Construct Tegrastats profiler."""
         super().__init__()
         self.tegrastats_path = tegrastats_path
         if shutil.which(self.tegrastats_path) is None:
