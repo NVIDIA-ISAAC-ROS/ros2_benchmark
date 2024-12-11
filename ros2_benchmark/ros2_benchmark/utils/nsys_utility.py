@@ -58,7 +58,7 @@ class NsysUtility():
 
         container_prefix = ''
         if enable_nsys:
-            if(not nsys_profile_name):
+            if not nsys_profile_name:
                 current_time = datetime.datetime.now(datetime.timezone.utc).\
                                strftime('%Y-%m-%dT%H:%M:%SZ')
                 nsys_profile_name = f'profile_{platform.machine()}_{current_time}'
