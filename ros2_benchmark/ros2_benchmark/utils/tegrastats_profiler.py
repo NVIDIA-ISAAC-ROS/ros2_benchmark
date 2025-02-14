@@ -18,6 +18,7 @@
 """Tegrastats profiler class to measure CPU and GPU performance of benchmark tests."""
 
 import numbers
+import os
 from pathlib import Path
 import re
 import shutil
@@ -41,6 +42,8 @@ class TegrastatsProfiler(Profiler):
             raise FileNotFoundError(f'{self.tegrastats_path} not found in $PATH')
         self._tegrastats_process = None
         self._tegrastats_output_lines = []
+        self.oc_event_count_at_start = None
+        self.oc_event_count_for_run = None
 
     def start_profiling(self, interval: float = 1.0) -> Path:
         """
@@ -53,6 +56,7 @@ class TegrastatsProfiler(Profiler):
 
         """
         super().start_profiling()
+        self.oc_event_count_at_start = self._get_oc_event_count()
         self._tegrastats_process = subprocess.Popen(
             [self.tegrastats_path, '--interval', str(int(interval*1000))],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -61,6 +65,9 @@ class TegrastatsProfiler(Profiler):
     def stop_profiling(self):
         """Stop profiling."""
         super().stop_profiling()
+        current_oc_count = self._get_oc_event_count()
+        if current_oc_count is not None and self.oc_event_count_at_start is not None:
+            self.oc_event_count_for_run = current_oc_count - self.oc_event_count_at_start
         if self._tegrastats_process is not None:
             self._tegrastats_process.terminate()
             output, _ = self._tegrastats_process.communicate()
@@ -109,6 +116,12 @@ class TegrastatsProfiler(Profiler):
         profile_data[ResourceMetrics.MAX_OVERALL_CPU_UTILIZATION] = max(cpu_values)
         profile_data[ResourceMetrics.MIN_OVERALL_CPU_UTILIZATION] = min(cpu_values)
 
+        if self.oc_event_count_for_run is not None:
+            profile_data[ResourceMetrics.OC_EVENT_COUNT] = self.oc_event_count_for_run
+        else:
+            self.get_logger().warn('Could not determine OC event count')
+            profile_data[ResourceMetrics.OC_EVENT_COUNT] = np.nan
+
         self._profile_data_list.append(profile_data)
         return profile_data
 
@@ -116,6 +129,10 @@ class TegrastatsProfiler(Profiler):
         """Reset the profiler state."""
         self.stop_profiling()
         self._profile_data_list.clear()
+        self._tegrastats_process = None
+        self._tegrastats_output_lines = []
+        self.oc_event_count_at_start = None
+        self.oc_event_count_for_run = None
         return
 
     def conclude_results(self) -> dict:
@@ -146,6 +163,8 @@ class TegrastatsProfiler(Profiler):
             ResourceMetrics.STDDEV_DEVICE_MEMORY_UTILIZATION,
             ResourceMetrics.STDDEV_ENCODER_UTILIZATION,
             ResourceMetrics.STDDEV_DECODER_UTILIZATION,
+            # oc count
+            ResourceMetrics.OC_EVENT_COUNT,
         ]
         MAX_METRICS = [
             ResourceMetrics.MAX_OVERALL_CPU_UTILIZATION,
@@ -186,3 +205,30 @@ class TegrastatsProfiler(Profiler):
 
         self.reset()
         return final_profile_data
+
+    def _get_oc_event_count(self):
+        """
+        Get current overcurrent event counter on Jetson systems.
+
+        OC events result in severe CPU/GPU throttling, so they are an important metric to monitor
+        during benchmarking.
+        """
+        # First, find the correct file path, assumes there is only one oc3_event_cnt file
+        # which is true on Xavier/Orin systems (Nano, Nx, AGX, etc.)
+        # If run on x86 will return None
+        oc_event_file = None
+        if os.path.exists('/sys/devices'):
+            for root, dirs, files in os.walk('/sys/devices'):
+                for file in files:
+                    if file == 'oc3_event_cnt':
+                        oc_event_file = os.path.join(root, file)
+                        break
+                if oc_event_file:
+                    break
+
+        oc_event_cnt = None
+        if oc_event_file and os.path.exists(oc_event_file):
+            with open(oc_event_file, 'r') as f:
+                oc_event_cnt = int(f.read().strip())
+
+        return oc_event_cnt

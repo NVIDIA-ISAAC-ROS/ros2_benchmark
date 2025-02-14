@@ -60,3 +60,5 @@ class ResourceMetrics(Enum):
     MIN_DECODER_UTILIZATION = 'Min. Decoder Utilization (%)'
     MEAN_DECODER_UTILIZATION = 'Mean Decoder Utilization (%)'
     STDDEV_DECODER_UTILIZATION = 'SD. Decoder Utilization (%)'
+    # OC event count
+    OC_EVENT_COUNT = 'Overcurrent Event Count'
