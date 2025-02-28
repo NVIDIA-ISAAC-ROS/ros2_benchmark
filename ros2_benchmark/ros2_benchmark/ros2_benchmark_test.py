@@ -917,7 +917,7 @@ class ROS2BenchmarkTest(unittest.TestCase):
             # Check if this probe frequency was sustainable
             first_monitor_perf = self.get_performance_results_of_first_monitor_calculator(
                 probe_perf_results)
-            if (first_monitor_perf[BasicPerformanceMetrics.MEAN_FRAME_RATE] >=
+            if (first_monitor_perf.get(BasicPerformanceMetrics.MEAN_FRAME_RATE, 0) >=
                 first_monitor_perf[BasicPerformanceMetrics.MEAN_PLAYBACK_FRAME_RATE] -
                 self.config.binary_search_acceptable_frame_rate_drop
                 ) and (
