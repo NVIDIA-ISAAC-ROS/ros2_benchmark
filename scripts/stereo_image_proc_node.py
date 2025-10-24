@@ -41,6 +41,7 @@ from ros2_benchmark import ROS2BenchmarkConfig, ROS2BenchmarkTest
 IMAGE_RESOLUTION = ImageResolution.QUARTER_HD
 ROSBAG_PATH = 'datasets/r2b_dataset/r2b_hideaway'
 
+
 def launch_setup(container_prefix, container_sigterm_timeout):
     """Generate launch description for benchmarking stereo_image_proc::DisparityNode."""
 
@@ -71,10 +72,10 @@ def launch_setup(container_prefix, container_sigterm_timeout):
         namespace=TestDisparityNode.generate_namespace(),
         package='ros2_benchmark',
         plugin='ros2_benchmark::DataLoaderNode',
-        remappings=[('hawk_0_left_rgb_image', 'data_loader/left_image'),
-                    ('hawk_0_left_rgb_camera_info', 'data_loader/left_camera_info'),
-                    ('hawk_0_right_rgb_image', 'data_loader/right_image'),
-                    ('hawk_0_right_rgb_camera_info', 'data_loader/right_camera_info')]
+        remappings=[('hawk_0_left_rgb_image', 'data_loader/left/image_raw'),
+                    ('hawk_0_left_rgb_camera_info', 'data_loader/left/camera_info'),
+                    ('hawk_0_right_rgb_image', 'data_loader/right/image_raw'),
+                    ('hawk_0_right_rgb_camera_info', 'data_loader/right/camera_info')]
     )
 
     prep_left_resize_node = ComposableNode(
@@ -88,10 +89,8 @@ def launch_setup(container_prefix, container_sigterm_timeout):
             'use_scale': False,
         }],
         remappings=[
-            ('image/image_raw', 'data_loader/left_image'),
-            ('image/camera_info', 'data_loader/left_camera_info'),
+            ('image/image_raw', 'data_loader/left/image_raw'),
             ('resize/image_raw', 'buffer/left/image_resized'),
-            ('resize/camera_info', 'buffer/left/camera_info_resized'),
         ]
     )
 
@@ -106,10 +105,8 @@ def launch_setup(container_prefix, container_sigterm_timeout):
             'use_scale': False,
         }],
         remappings=[
-            ('image/image_raw', 'data_loader/right_image'),
-            ('image/camera_info', 'data_loader/right_camera_info'),
+            ('image/image_raw', 'data_loader/right/image_raw'),
             ('resize/image_raw', 'buffer/right/image_resized'),
-            ('resize/camera_info', 'buffer/right/camera_info_resized'),
         ]
     )
 
@@ -127,11 +124,11 @@ def launch_setup(container_prefix, container_sigterm_timeout):
         }],
         remappings=[('buffer/input0', 'buffer/left/image_resized'),
                     ('input0', 'left/image_rect'),
-                    ('buffer/input1', 'buffer/left/camera_info_resized'),
+                    ('buffer/input1', 'buffer/left/camera_info'),
                     ('input1', 'left/camera_info'),
                     ('buffer/input2', 'buffer/right/image_resized'),
                     ('input2', 'right/image_rect'),
-                    ('buffer/input3', 'buffer/right/camera_info_resized'),
+                    ('buffer/input3', 'buffer/right/camera_info'),
                     ('input3', 'right/camera_info')],
     )
 
@@ -166,6 +163,7 @@ def launch_setup(container_prefix, container_sigterm_timeout):
     )
 
     return [composable_node_container]
+
 
 def generate_test_description():
     return TestDisparityNode.generate_test_description_with_nsys(launch_setup)

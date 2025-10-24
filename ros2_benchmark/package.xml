@@ -21,7 +21,7 @@ SPDX-License-Identifier: Apache-2.0
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>ros2_benchmark</name>
-  <version>3.2.12</version>
+  <version>4.0.0</version>
   <description>Benchmarking framework for ROS 2 graphs</description>
 
   <maintainer email="isaac-ros-maintainers@nvidia.com">Isaac ROS Maintainers</maintainer>
@@ -41,6 +41,7 @@ SPDX-License-Identifier: Apache-2.0
   <depend>rosbag2_compression_zstd</depend>
   <depend>rosbag2_cpp</depend>
   <depend>rosbag2_py</depend>
+  <depend>rosbag2_storage</depend>
   <depend>std_msgs</depend>
 
   <test_depend>ament_lint_auto</test_depend>

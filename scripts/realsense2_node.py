@@ -38,6 +38,7 @@ from ros2_benchmark import MonitorPerformanceCalculatorsInfo
 
 IMAGE_RESOLUTION = ImageResolution.VGA
 
+
 def launch_setup(container_prefix, container_sigterm_timeout):
     """Generate launch description for live benchmarking Realsense2 camera."""
     # RealSense
@@ -45,17 +46,18 @@ def launch_setup(container_prefix, container_sigterm_timeout):
         TestRealsense2Node.get_assets_root_path(),
         'configs', 'realsense.yaml')
 
+    camera_name = 'Realsense2Camera'
     realsense_node = ComposableNode(
-        name='Realsense2Camera',
+        name=camera_name,
         namespace=TestRealsense2Node.generate_namespace(),
         package='realsense2_camera',
         plugin='realsense2_camera::RealSenseNodeFactory',
         parameters=[realsense_config_file_path],
         remappings=[
-            ('infra1/image_rect_raw', 'left/image_rect_raw_mono'),
-            ('infra2/image_rect_raw', 'right/image_rect_raw_mono'),
-            ('infra1/camera_info', 'left/camerainfo'),
-            ('infra2/camera_info', 'right/camerainfo')
+            (f'/{camera_name}/infra1/image_rect_raw', 'left/image_rect_raw_mono'),
+            (f'/{camera_name}/infra2/image_rect_raw', 'right/image_rect_raw_mono'),
+            (f'/{camera_name}/infra1/camera_info', 'left/camerainfo'),
+            (f'/{camera_name}/infra2/camera_info', 'right/camerainfo')
         ]
     )
 
@@ -99,6 +101,7 @@ def launch_setup(container_prefix, container_sigterm_timeout):
     )
 
     return [composable_node_container]
+
 
 def generate_test_description():
     return TestRealsense2Node.generate_test_description_with_nsys(launch_setup)

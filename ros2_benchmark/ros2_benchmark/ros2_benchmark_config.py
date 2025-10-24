@@ -154,6 +154,10 @@ class ROS2BenchmarkConfig():
                             calculator_list))
                 setattr(self, key, monitor_info_list)
             else:
+                # Expand environment variables for path-related config keys
+                path_keys = ['assets_root', 'ros1_ws', 'log_folder', 'input_data_path']
+                if key in path_keys and isinstance(value, str):
+                    value = os.path.expandvars(value)
                 if key in self.__config_type_map:
                     value_type = self.__config_type_map[key]
                     if value_type is bool and isinstance(value, str):

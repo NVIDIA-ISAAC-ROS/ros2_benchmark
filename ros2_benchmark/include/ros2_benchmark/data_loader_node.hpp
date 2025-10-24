@@ -32,8 +32,8 @@
 #include "rosbag2_compression_zstd/zstd_decompressor.hpp"
 #include "rosbag2_cpp/typesupport_helpers.hpp"
 #include "rosbag2_cpp/readers/sequential_reader.hpp"
-#include "rosbag2_cpp/storage_options.hpp"
 #include "rosbag2_cpp/converter_options.hpp"
+#include "rosbag2_storage/storage_options.hpp"
 
 #include "std_msgs/msg/header.hpp"
 

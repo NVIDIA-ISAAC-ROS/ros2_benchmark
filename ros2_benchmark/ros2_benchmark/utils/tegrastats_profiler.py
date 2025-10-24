@@ -34,7 +34,7 @@ from .resource_metrics import ResourceMetrics
 class TegrastatsProfiler(Profiler):
     """Tegrastats profiler class to measure CPU and GPU performance of benchmark tests."""
 
-    def __init__(self, tegrastats_path='tegrastats'):
+    def __init__(self, tegrastats_path='tegrastats', nvidia_smi_path='nvidia-smi'):
         """Construct Tegrastats profiler."""
         super().__init__()
         self.tegrastats_path = tegrastats_path
@@ -44,6 +44,11 @@ class TegrastatsProfiler(Profiler):
         self._tegrastats_output_lines = []
         self.oc_event_count_at_start = None
         self.oc_event_count_for_run = None
+        self.nvidia_smi_path = nvidia_smi_path
+        if not shutil.which(self.nvidia_smi_path):
+            raise FileNotFoundError(f'{self.nvidia_smi_path} not found in $PATH')
+        self._nvidia_smi_process = None
+        self._nvidia_smi_output_lines = []
 
     def start_profiling(self, interval: float = 1.0) -> Path:
         """
@@ -58,7 +63,10 @@ class TegrastatsProfiler(Profiler):
         super().start_profiling()
         self.oc_event_count_at_start = self._get_oc_event_count()
         self._tegrastats_process = subprocess.Popen(
-            [self.tegrastats_path, '--interval', str(int(interval*1000))],
+            ['sudo', self.tegrastats_path, '--interval', str(int(interval*1000))],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        self._nvidia_smi_process = subprocess.Popen(
+            [self.nvidia_smi_path, 'dmon', '--format', 'csv'],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         return self._log_file_path
 
@@ -74,6 +82,12 @@ class TegrastatsProfiler(Profiler):
             output = output.decode('utf-8')
             self._tegrastats_output_lines = output.splitlines()
             self._tegrastats_process = None
+        if self._nvidia_smi_process is not None:
+            self._nvidia_smi_process.terminate()
+            output, _ = self._nvidia_smi_process.communicate()
+            output = output.decode('utf-8')
+            self._nvidia_smi_output_lines = output.splitlines()
+            self._nvidia_smi_process = None
 
     @staticmethod
     def get_current_usage():
@@ -95,14 +109,34 @@ class TegrastatsProfiler(Profiler):
         profile_data = {}
         gpu_values = []
         cpu_values = []
-        for line in self._tegrastats_output_lines:
-            fields = line.split()
-            gpu_str = fields[fields.index('GR3D_FREQ')+1]
-            cpu_str = fields[fields.index('CPU')+1][1:-1]
-            gpu_values.append(float(gpu_str.split('%')[0]))
-            cpu_array = re.split('%@[0-9]+[,]?', cpu_str)
-            cpu_array = [float(value) for value in cpu_array[:-1]]
-            cpu_values.append(np.mean(cpu_array))
+
+        try:
+            # Parse CPU utilization from tegrastats output
+            for line in self._tegrastats_output_lines:
+                fields = line.split()
+                cpu_str = fields[fields.index('CPU')+1][1:-1]
+                cpu_array = re.split('%@[0-9]+[,]?', cpu_str)
+                cpu_array = [float(value) for value in cpu_array[:-1]]
+                cpu_values.append(np.mean(cpu_array))
+        except Exception as e:
+            self.get_logger().warn(f'Failed to parse tegrastats output: {e}')
+            cpu_values = [float('nan')]
+
+        try:
+            # Parse GPU SM utilization from nvidia-smi dmon output
+            gpu_header_row = self._nvidia_smi_output_lines[0]
+            gpu_sm_idx = [col.strip() for col in gpu_header_row.split(',')].index('sm')
+            # Skip header and units rows
+            for line in self._nvidia_smi_output_lines[2:]:
+                parts = [p.strip() for p in line.split(',')]
+                try:
+                    gpu_values.append(float(parts[gpu_sm_idx]))
+                except Exception as e:
+                    self.get_logger().warn(f'Skipping line: {line}  Error: {e}')
+                    continue
+        except Exception as e:
+            self.get_logger().warn(f'Failed to parse nvidia-smi output: {e}')
+            gpu_values = [float('nan')]
 
         profile_data[ResourceMetrics.BASELINE_DEVICE_UTILIZATION] = gpu_values[0]
         profile_data[ResourceMetrics.MEAN_DEVICE_UTILIZATION] = np.mean(gpu_values)
@@ -133,6 +167,8 @@ class TegrastatsProfiler(Profiler):
         self._tegrastats_output_lines = []
         self.oc_event_count_at_start = None
         self.oc_event_count_for_run = None
+        self._nvidia_smi_process = None
+        self._nvidia_smi_output_lines = []
         return
 
     def conclude_results(self) -> dict:
