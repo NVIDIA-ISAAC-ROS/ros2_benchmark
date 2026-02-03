@@ -1,5 +1,5 @@
 # SPDX-FileCopyrightText: NVIDIA CORPORATION & AFFILIATES
-# Copyright (c) 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# Copyright (c) 2023-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -42,17 +42,27 @@ import yaml
 from .basic_performance_calculator import BasicPerformanceMetrics
 from .ros2_benchmark_config import BenchmarkMode
 from .ros2_benchmark_config import ROS2BenchmarkConfig
+from .utils.generic_profiler import GenericProfiler
 from .utils.nsys_utility import NsysUtility
+from .utils.nvidia_smi_profiler import nvidia_smi_available, NvidiaSmiProfiler
 from .utils.resource_metrics import ResourceMetrics
 from .utils.ros2_utility import ClientUtility
-from .utils.tegrastats_profiler import TegrastatsProfiler
-from .utils.x86_profiler import X86Profiler
 
 
 # The maximum allowed line width of a performance repeort displayed in the terminal
 MAX_REPORT_OUTPUT_WIDTH = 90
 idle_cpu_util = None
 idle_gpu_util = None
+
+
+def _get_resource_profiler():
+    """Select the appropriate resource profiler based on platform."""
+    if nvidia_smi_available:
+        rclpy.logging.get_logger('r2b').info('Use nvidia-smi resource profiler')
+        return NvidiaSmiProfiler()
+    else:
+        rclpy.logging.get_logger('r2b').info('Use generic resource profiler')
+        return GenericProfiler()
 
 
 class BenchmarkMetadata(Enum):
@@ -117,12 +127,7 @@ class ROS2BenchmarkTest(unittest.TestCase):
         self._monitor_raw_data_export = {}
         self._monitor_raw_data_export['benchmark_name'] = self.config.benchmark_name
 
-        try:
-            self._resource_profiler = TegrastatsProfiler()
-            rclpy.logging.get_logger('r2b').info('Use tegrastats resource profiler')
-        except FileNotFoundError:
-            self._resource_profiler = X86Profiler()
-            rclpy.logging.get_logger('r2b').info('Use x86 resource profiler')
+        self._resource_profiler = _get_resource_profiler()
 
         super().__init__(*args, **kwargs)
 
@@ -182,12 +187,7 @@ class ROS2BenchmarkTest(unittest.TestCase):
         time.sleep(10)
         global idle_cpu_util
         global idle_gpu_util
-        try:
-            resource_profiler = TegrastatsProfiler()
-            rclpy.logging.get_logger('r2b').info('Probing with tegrastats resource profiler...')
-        except FileNotFoundError:
-            resource_profiler = X86Profiler()
-            rclpy.logging.get_logger('r2b').info('Probing with x86 profiler...')
+        resource_profiler = _get_resource_profiler()
         current_usage = resource_profiler.get_current_usage()
 
         if ResourceMetrics.MEAN_OVERALL_CPU_UTILIZATION in current_usage:

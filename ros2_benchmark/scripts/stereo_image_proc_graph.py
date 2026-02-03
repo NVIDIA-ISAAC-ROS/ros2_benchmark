@@ -36,8 +36,11 @@ import os
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
 
-from ros2_benchmark import ImageResolution
-from ros2_benchmark import ROS2BenchmarkConfig, ROS2BenchmarkTest
+from ros2_benchmark import (
+    ImageResolution,
+    ROS2BenchmarkConfig,
+    ROS2BenchmarkTest
+)
 
 IMAGE_RESOLUTION = ImageResolution.QUARTER_HD
 ROSBAG_PATH = 'datasets/r2b_dataset/r2b_hideaway'
@@ -45,7 +48,6 @@ ROSBAG_PATH = 'datasets/r2b_dataset/r2b_hideaway'
 
 def launch_setup(container_prefix, container_sigterm_timeout):
     """Generate launch description for benchmarking stereo_image_proc point cloud graph."""
-
     env = os.environ.copy()
     env['OSPL_VERBOSITY'] = '8'  # 8 = OS_NONE
     # bare minimum formatting for console output matching

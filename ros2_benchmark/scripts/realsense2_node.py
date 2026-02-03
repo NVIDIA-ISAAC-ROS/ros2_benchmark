@@ -31,10 +31,14 @@ import os
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
 
-from ros2_benchmark import ImageResolution
-from ros2_benchmark import BasicPerformanceCalculator, BenchmarkMode
-from ros2_benchmark import ROS2BenchmarkConfig, ROS2BenchmarkTest
-from ros2_benchmark import MonitorPerformanceCalculatorsInfo
+from ros2_benchmark import (
+    BasicPerformanceCalculator,
+    BenchmarkMode,
+    ImageResolution,
+    MonitorPerformanceCalculatorsInfo,
+    ROS2BenchmarkConfig,
+    ROS2BenchmarkTest
+)
 
 IMAGE_RESOLUTION = ImageResolution.VGA
 
