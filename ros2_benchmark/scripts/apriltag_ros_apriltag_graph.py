@@ -15,17 +15,18 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 """
-Performance test for image_proc RectifyNode.
+Performance test for apriltag_ros graph.
 
 The graph consists of the following:
 - Preprocessors:
-    None
+    1. PrepResizeNode: resizes images to HD
 - Graph under Test:
     1. RectifyNode: rectifies images
+    2. AprilTagNode: detects Apriltags
 
 Required:
 - Packages:
-    - image_proc
+    - apriltag_ros
 - Datasets:
     - assets/datasets/r2b_dataset/r2b_storage
 """
@@ -33,26 +34,46 @@ Required:
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
 
-from ros2_benchmark import ImageResolution
-from ros2_benchmark import ROS2BenchmarkConfig, ROS2BenchmarkTest
+from ros2_benchmark import (
+    ImageResolution,
+    ROS2BenchmarkConfig,
+    ROS2BenchmarkTest
+)
 
 IMAGE_RESOLUTION = ImageResolution.HD
 ROSBAG_PATH = 'datasets/r2b_dataset/r2b_storage'
 
+
 def launch_setup(container_prefix, container_sigterm_timeout):
-    """Generate launch description for benchmarking image_proc RectifyNode."""
+    """Generate launch description for benchmarking apriltag_ros graph."""
+    # Detector parameters to detect all 36h11 tags
+    cfg_36h11 = {
+        'image_transport': 'raw',
+        'family': '36h11',
+        'size': 0.162
+    }
 
     rectify_node = ComposableNode(
         name='RectifyNode',
-        namespace=TestRectifyNode.generate_namespace(),
+        namespace=TestAprilTagGraph.generate_namespace(),
         package='image_proc',
-        plugin='image_proc::RectifyNode',
-        remappings=[('image', 'image_raw')],
+        plugin='image_proc::RectifyNode'
+    )
+
+    apriltag_node = ComposableNode(
+        name='AprilTagNode',
+        namespace=TestAprilTagGraph.generate_namespace(),
+        package='apriltag_ros',
+        plugin='AprilTagNode',
+        parameters=[cfg_36h11],
+        remappings=[
+            ('detections', 'apriltag_detections')
+        ]
     )
 
     data_loader_node = ComposableNode(
         name='DataLoaderNode',
-        namespace=TestRectifyNode.generate_namespace(),
+        namespace=TestAprilTagGraph.generate_namespace(),
         package='ros2_benchmark',
         plugin='ros2_benchmark::DataLoaderNode',
         remappings=[('hawk_0_left_rgb_image', 'data_loader/image'),
@@ -61,7 +82,7 @@ def launch_setup(container_prefix, container_sigterm_timeout):
 
     prep_resize_node = ComposableNode(
         name='PrepResizeNode',
-        namespace=TestRectifyNode.generate_namespace(),
+        namespace=TestAprilTagGraph.generate_namespace(),
         package='image_proc',
         plugin='image_proc::ResizeNode',
         parameters=[{
@@ -79,7 +100,7 @@ def launch_setup(container_prefix, container_sigterm_timeout):
 
     playback_node = ComposableNode(
         name='PlaybackNode',
-        namespace=TestRectifyNode.generate_namespace(),
+        namespace=TestAprilTagGraph.generate_namespace(),
         package='ros2_benchmark',
         plugin='ros2_benchmark::PlaybackNode',
         parameters=[{
@@ -88,26 +109,26 @@ def launch_setup(container_prefix, container_sigterm_timeout):
                 'sensor_msgs/msg/CameraInfo'],
         }],
         remappings=[('buffer/input0', 'buffer/image'),
-                    ('input0', 'image_raw'),
+                    ('input0', 'image'),
                     ('buffer/input1', 'buffer/camera_info'),
                     ('input1', 'camera_info')],
     )
 
     monitor_node = ComposableNode(
         name='MonitorNode',
-        namespace=TestRectifyNode.generate_namespace(),
+        namespace=TestAprilTagGraph.generate_namespace(),
         package='ros2_benchmark',
         plugin='ros2_benchmark::MonitorNode',
         parameters=[{
-            'monitor_data_format': 'sensor_msgs/msg/Image',
+            'monitor_data_format': 'apriltag_msgs/msg/AprilTagDetectionArray',
         }],
         remappings=[
-            ('output', 'image_rect')],
+            ('output', 'apriltag_detections')],
     )
 
     composable_node_container = ComposableNodeContainer(
         name='container',
-        namespace=TestRectifyNode.generate_namespace(),
+        namespace=TestAprilTagGraph.generate_namespace(),
         package='rclcpp_components',
         executable='component_container_mt',
         prefix=container_prefix,
@@ -117,29 +138,34 @@ def launch_setup(container_prefix, container_sigterm_timeout):
             prep_resize_node,
             playback_node,
             monitor_node,
-            rectify_node
+            rectify_node,
+            apriltag_node
         ],
         output='screen'
     )
 
     return [composable_node_container]
 
+
 def generate_test_description():
-    return TestRectifyNode.generate_test_description_with_nsys(launch_setup)
+    return TestAprilTagGraph.generate_test_description_with_nsys(launch_setup)
 
 
-class TestRectifyNode(ROS2BenchmarkTest):
-    """Performance test for image_proc RectifyNode."""
+class TestAprilTagGraph(ROS2BenchmarkTest):
+    """Performance test for AprilTag graph."""
 
     # Custom configurations
     config = ROS2BenchmarkConfig(
-        benchmark_name='image_proc::RectifyNode Benchmark',
+        benchmark_name='apriltag_ros AprilTag Graph Benchmark',
         input_data_path=ROSBAG_PATH,
+        # The slice of the rosbag to use
+        input_data_start_time=3.0,
+        input_data_end_time=3.5,
         # Upper and lower bounds of peak throughput search window
-        publisher_upper_frequency=2500.0,
+        publisher_upper_frequency=600.0,
         publisher_lower_frequency=10.0,
         # The number of frames to be buffered
-        playback_message_buffer_size=100,
+        playback_message_buffer_size=10,
         custom_report_info={'data_resolution': IMAGE_RESOLUTION}
     )
 

@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 # SPDX-License-Identifier: Apache-2.0
-"""CPU profiler class to measure performance of benchmark tests."""
+"""Generic profiler class to measure CPU and GPU performance of benchmark tests."""
 
 import numbers
 from pathlib import Path
@@ -36,18 +36,23 @@ CPU_IDENTIFIER_STR = 'CPU: '
 GPU_IDENTIFIER_STR = 'GPU: '
 
 
-class X86Profiler(Profiler):
-    """x86 profiler class to measure x86 performance of benchmark tests."""
+class GenericProfiler(Profiler):
+    """
+    Generic profiler class to measure CPU and GPU performance of benchmark tests.
+
+    This profiler uses psutil for CPU profiling and gpustat for GPU profiling.
+    will fall back to psutil for CPU only profiling if gpustat is not available.
+    """
 
     def __init__(self):
-        """Construct x86 profiler."""
+        """Construct generic profiler."""
         super().__init__()
         if not gpustat_imported:
             self.get_logger().warn('Failed to import gpustat. Disabled GPU profiling.')
 
     def start_profiling(self, interval: float = 1.0) -> Path:
         """
-        Start x86 profiling thread to keep track of performance metrics.
+        Start generic profiling thread to keep track of performance metrics.
 
         Parameters
         ----------
@@ -89,7 +94,7 @@ class X86Profiler(Profiler):
 
     @staticmethod
     def get_current_usage():
-        """Return current x86 usage."""
+        """Return current generic usage."""
         profile_data = {}
         profile_data[ResourceMetrics.MEAN_OVERALL_CPU_UTILIZATION] = \
             np.mean(psutil.cpu_percent(interval=1.0, percpu=True))
@@ -102,7 +107,7 @@ class X86Profiler(Profiler):
         return profile_data
 
     def get_results(self, log_file_path=None) -> dict:
-        """Return x86 profiling results."""
+        """Return generic profiling results."""
         assert not self._is_running, 'Cannot collect results until profiler has been stopped!'
 
         log_file_path = self._log_file_path if log_file_path is None else log_file_path
