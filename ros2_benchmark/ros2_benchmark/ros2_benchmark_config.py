@@ -25,9 +25,20 @@ import yaml
 from .basic_performance_calculator import BasicPerformanceCalculator
 from .utils.image_utility import Resolution
 
-BUILTIN_ros2_benchmark_CONFIG_FILE = os.path.join(
+# Default config: same directory as this module (colcon / non-Bazel install).
+_CONFIG_SAME_DIR = os.path.join(
     os.path.dirname(__file__),
     'default_ros2_benchmark_config.yaml')
+# Bazel runfiles: config lives at package root under bazel_config/.
+_CONFIG_BAZEL = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)),
+    'bazel_config',
+    'default_ros2_benchmark_config.yaml')
+
+_under_bazel = 'RUNFILES_DIR' in os.environ or '.runfiles' in os.path.abspath(__file__)
+BUILTIN_ros2_benchmark_CONFIG_FILE = (
+    _CONFIG_BAZEL if _under_bazel and os.path.isfile(_CONFIG_BAZEL)
+    else _CONFIG_SAME_DIR)
 
 
 class MonitorPerformanceCalculatorsInfo:
