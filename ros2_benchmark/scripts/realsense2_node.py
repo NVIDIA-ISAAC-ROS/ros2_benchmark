@@ -58,10 +58,10 @@ def launch_setup(container_prefix, container_sigterm_timeout):
         plugin='realsense2_camera::RealSenseNodeFactory',
         parameters=[realsense_config_file_path],
         remappings=[
-            (f'/{camera_name}/infra1/image_rect_raw', 'left/image_rect_raw_mono'),
-            (f'/{camera_name}/infra2/image_rect_raw', 'right/image_rect_raw_mono'),
-            (f'/{camera_name}/infra1/camera_info', 'left/camerainfo'),
-            (f'/{camera_name}/infra2/camera_info', 'right/camerainfo')
+            (f'{camera_name}/infra1/image_rect_raw', 'left/image_rect_raw_mono'),
+            (f'{camera_name}/infra2/image_rect_raw', 'right/image_rect_raw_mono'),
+            (f'{camera_name}/infra1/camera_info', 'left/camerainfo'),
+            (f'{camera_name}/infra2/camera_info', 'right/camerainfo')
         ]
     )
 
