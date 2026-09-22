@@ -39,6 +39,9 @@ ros2_benchmark_config:
     # Collect start timestamps from the messages observed by monitors
     collect_start_timestamps_from_monitors: false
 
+    # Collect parameter values from every node in the benchmark namespace
+    collect_node_parameters: false
+
     # Enable resource profiling during benchmarking
     enable_resource_profiler: true
 
@@ -83,7 +86,7 @@ ros2_benchmark_config:
     default_service_future_timeout_sec: 15
     set_data_service_future_timeout_sec: 60
     start_recording_service_future_timeout_sec: 35
-    play_messages_service_future_timeout_sec: 15
+    play_messages_service_future_timeout_sec: 30
 
    # Amount of time to wait before and after trial run before starting test iterations
     pre_trial_run_wait_time_sec: 0.0

@@ -61,5 +61,13 @@ bool revise_timestamps_as_message_ids false
 # - The target publisher rate cannot be met when enforce_publisher_rate is enabled
 bool success false
 
+# Whether the target publisher rate was maintained throughout the playback.
+# Unlike enforce_publisher_rate, this does not abort the playback; it reports
+# after the fact that the node published slower than requested. A caller that
+# is probing for a sustainable rate should treat the probe as unsustainable,
+# since the pipeline was never actually driven at target_publisher_rate.
+# Always true for PLAYBACK_MODE_TIMELINE, which ignores target_publisher_rate.
+bool publisher_rate_met true
+
 # The keys and timestamps of the messages that have been published
 TimestampedMessageArray timestamps

@@ -37,7 +37,7 @@ DataLoaderNode::DataLoaderNode(const rclcpp::NodeOptions & options)
         this,
         std::placeholders::_1,
         std::placeholders::_2),
-      rmw_qos_profile_default,
+      rclcpp::ServicesQoS(),
       service_callback_group_)},
   start_loading_service_{
     create_service<ros2_benchmark_interfaces::srv::StartLoading>(
@@ -47,14 +47,14 @@ DataLoaderNode::DataLoaderNode(const rclcpp::NodeOptions & options)
         this,
         std::placeholders::_1,
         std::placeholders::_2),
-      rmw_qos_profile_default,
+      rclcpp::ServicesQoS(),
       service_callback_group_)},
   stop_loading_service_{
     create_service<ros2_benchmark_interfaces::srv::StopLoading>(
       "stop_loading",
       std::bind(&DataLoaderNode::StopLoadingServiceCallback, this, std::placeholders::_1,
       std::placeholders::_2),
-      rmw_qos_profile_default, service_callback_group_)},
+      rclcpp::ServicesQoS(), service_callback_group_)},
   get_topic_message_timestamps_service_{
     create_service<ros2_benchmark_interfaces::srv::GetTopicMessageTimestamps>(
       "get_topic_message_timestamps",
@@ -63,7 +63,7 @@ DataLoaderNode::DataLoaderNode(const rclcpp::NodeOptions & options)
         this,
         std::placeholders::_1,
         std::placeholders::_2),
-      rmw_qos_profile_default,
+      rclcpp::ServicesQoS(),
       service_callback_group_)},
   publisher_period_ms_(declare_parameter<int64_t>("publisher_period_ms", 10))
 {
@@ -345,8 +345,8 @@ DataLoaderNode::CreateTopicMessageTimestampArrayMessageList(
 
 void DataLoaderNode::OpenRosbagFile()
 {
-  rcpputils::fs::path rosbag_path(rosbag_path_);
-  if (!rosbag_path.exists()) {
+  const std::filesystem::path rosbag_path(rosbag_path_);
+  if (!std::filesystem::exists(rosbag_path)) {
     std::stringstream error_msg;
     error_msg << "Could not load a rosbag file. " <<
       "\"" << rosbag_path.string() <<

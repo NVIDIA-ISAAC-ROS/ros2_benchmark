@@ -36,7 +36,7 @@ MonitorNode::MonitorNode(
         this,
         std::placeholders::_1,
         std::placeholders::_2),
-      rmw_qos_profile_default,
+      rclcpp::ServicesQoS(),
       service_callback_group_)},
   stop_monitoring_service_{
     create_service<ros2_benchmark_interfaces::srv::StopMonitoring>(
@@ -46,7 +46,7 @@ MonitorNode::MonitorNode(
         this,
         std::placeholders::_1,
         std::placeholders::_2),
-      rmw_qos_profile_default,
+      rclcpp::ServicesQoS(),
       service_callback_group_)}
 {
 }

@@ -164,7 +164,7 @@ class BasicPerformanceCalculator():
     def conclude_performance(self) -> dict:
         """Calculate final statistical performance outcome based on all results."""
         if len(self._perf_data_list) == 0:
-            self.get_logger().warn('No prior performance measurements to conclude')
+            self.get_logger().warning('No prior performance measurements to conclude')
             return {}
 
         MEAN_METRICS = [
