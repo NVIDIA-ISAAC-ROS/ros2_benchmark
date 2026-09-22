@@ -83,6 +83,7 @@ class ROS2BenchmarkConfig():
     __config_type_map = {
         'revise_timestamps_as_message_ids': bool,
         'collect_start_timestamps_from_monitors': bool,
+        'collect_node_parameters': bool,
         'enable_resource_profiler': bool,
         'publish_tf_messages_in_set_data': bool,
         'publish_tf_static_messages_in_set_data': bool,

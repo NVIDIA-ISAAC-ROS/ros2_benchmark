@@ -48,7 +48,7 @@ class GenericProfiler(Profiler):
         """Construct generic profiler."""
         super().__init__()
         if not gpustat_imported:
-            self.get_logger().warn('Failed to import gpustat. Disabled GPU profiling.')
+            self.get_logger().warning('Failed to import gpustat. Disabled GPU profiling.')
 
     def start_profiling(self, interval: float = 1.0) -> Path:
         """
@@ -172,7 +172,7 @@ class GenericProfiler(Profiler):
     def conclude_results(self) -> dict:
         """Conclude final profiling outcome based on all previous results."""
         if len(self._profile_data_list) == 0:
-            self.get_logger().warn('No prior profile data to conclude')
+            self.get_logger().warning('No prior profile data to conclude')
             return {}
 
         MEAN_METRICS = [

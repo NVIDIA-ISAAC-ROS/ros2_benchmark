@@ -25,7 +25,10 @@ Required:
     - test/pol.bag (included in repo)
 """
 
+import json
 import os
+import tempfile
+import uuid
 
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
@@ -34,6 +37,7 @@ from ros2_benchmark import BenchmarkMode, ROS2BenchmarkConfig, ROS2BenchmarkTest
 
 DIR_PATH = os.path.dirname(os.path.realpath(__file__))
 ROSBAG_PATH = os.path.join(DIR_PATH, 'pol.bag')
+LOG_FILE_NAME = f'ros2-benchmark-pol-{uuid.uuid4().hex}.json'
 
 
 def launch_setup(container_prefix, container_sigterm_timeout):
@@ -115,7 +119,40 @@ class TestBenchmarkPol(ROS2BenchmarkTest):
         publisher_upper_frequency=100.0,
         publisher_lower_frequency=10.0,
         playback_message_buffer_size=100,
+        collect_node_parameters=True,
+        log_folder=tempfile.gettempdir(),
+        log_file_name=LOG_FILE_NAME,
     )
 
     def test_benchmark(self):
+        report_path = self._log_file_path + '.json'
+        self.addCleanup(
+            lambda path: os.path.exists(path) and os.remove(path),
+            report_path)
+
         self.run_benchmark()
+
+        with open(report_path) as report_file:
+            report = json.load(report_file)
+
+        node_parameters = report['metadata']['BenchmarkMetadata.NODE_PARAMETERS']
+        node_parameter_errors = report['metadata'].get(
+            'BenchmarkMetadata.NODE_PARAMETER_ERRORS', {})
+        self.assertIn('/r2b/Controller', node_parameters)
+        self.assertEqual(
+            node_parameters['/r2b/PlaybackNode']['ros__parameters']['data_formats'],
+            [
+                'sensor_msgs/msg/Image',
+                'sensor_msgs/msg/CameraInfo',
+            ])
+        self.assertEqual(
+            node_parameters['/r2b/MonitorNode']['ros__parameters'][
+                'monitor_data_format'],
+            'sensor_msgs/msg/Image')
+        self.assertEqual(
+            node_parameters['/r2b/DataLoaderNode']['ros__parameters'][
+                'publisher_period_ms'],
+            10)
+        self.assertIn('/r2b/container', node_parameter_errors)
+        self.assertIsInstance(node_parameter_errors['/r2b/container'], str)
+        self.assertTrue(node_parameter_errors['/r2b/container'])

@@ -33,6 +33,8 @@ from launch.actions import OpaqueFunction
 import launch_testing.actions
 
 import rclpy
+from rclpy.parameter import parameter_value_to_python
+from rclpy.parameter_client import AsyncParameterClient
 from ros2_benchmark_interfaces.srv import GetTopicMessageTimestamps, PlayMessages
 from ros2_benchmark_interfaces.srv import SetData, StartLoading, StopLoading
 from ros2_benchmark_interfaces.srv import StartMonitoring, StartRecording, StopMonitoring
@@ -85,6 +87,8 @@ class BenchmarkMetadata(Enum):
     IDLE_GPU_UTIL = 'Idle GPU Util. (%)'
     PEAK_THROUGHPUT_PREDICTION = 'Peak Throughput Prediction (Hz)'
     CONFIG = 'Test Configurations'
+    NODE_PARAMETERS = 'Node Parameters'
+    NODE_PARAMETER_ERRORS = 'Node Parameter Collection Errors'
 
 
 class ROS2BenchmarkTest(unittest.TestCase):
@@ -127,7 +131,13 @@ class ROS2BenchmarkTest(unittest.TestCase):
         self._monitor_raw_data_export = {}
         self._monitor_raw_data_export['benchmark_name'] = self.config.benchmark_name
 
+        self._node_parameters = {}
+        self._node_parameter_errors = {}
+
         self._resource_profiler = _get_resource_profiler()
+
+        # Default: true; overwritten at the start of each benchmark_body call.
+        self._playback_rate_met = True
 
         super().__init__(*args, **kwargs)
 
@@ -331,10 +341,13 @@ class ROS2BenchmarkTest(unittest.TestCase):
 
         heading = self.config.benchmark_name
 
-        # Temporarily remove configs from the report as we don't want it to be printed
-        config_value = None
+        # Configs can be very large, so keep them in the report without printing them.
+        report_to_print = report.copy()
         if 'metadata' in report:
-            config_value = report['metadata'].pop(BenchmarkMetadata.CONFIG, None)
+            report_to_print['metadata'] = report['metadata'].copy()
+            report_to_print['metadata'].pop(BenchmarkMetadata.CONFIG, None)
+            report_to_print['metadata'].pop(BenchmarkMetadata.NODE_PARAMETERS, None)
+            report_to_print['metadata'].pop(BenchmarkMetadata.NODE_PARAMETER_ERRORS, None)
 
         is_prev_dict = False
         table_blocks = []
@@ -365,7 +378,7 @@ class ROS2BenchmarkTest(unittest.TestCase):
                     table_block_rows.append(f'{prefix}{key_str} : {value}')
                     is_prev_dict = False
 
-        construct_table_blocks_helper('', report)
+        construct_table_blocks_helper('', report_to_print)
         if len(table_block_rows) > 0:
             table_blocks.append(table_block_rows)
         max_row_width = max([len(row) for rows in table_blocks for row in rows] +
@@ -391,9 +404,6 @@ class ROS2BenchmarkTest(unittest.TestCase):
 
         print_table_helper()
 
-        if config_value is not None:
-            report['metadata'][BenchmarkMetadata.CONFIG] = config_value
-
     def construct_final_report(self, report: dict) -> dict:
         """Construct and return the final report from the given report."""
         final_report = report
@@ -417,6 +427,11 @@ class ROS2BenchmarkTest(unittest.TestCase):
         metadata[BenchmarkMetadata.DEVICE_OS] = \
             f'{uname.system} {uname.release} {uname.version}'
         metadata[BenchmarkMetadata.CONFIG] = self.config.to_yaml_str()
+        if self.config.collect_node_parameters:
+            metadata[BenchmarkMetadata.NODE_PARAMETERS] = self._node_parameters
+            if self._node_parameter_errors:
+                metadata[BenchmarkMetadata.NODE_PARAMETER_ERRORS] = \
+                    self._node_parameter_errors
         if idle_cpu_util is not None:
             metadata[BenchmarkMetadata.IDLE_CPU_UTIL] = idle_cpu_util
         if idle_gpu_util is not None:
@@ -442,6 +457,91 @@ class ROS2BenchmarkTest(unittest.TestCase):
         final_report['metadata'] = metadata
 
         return final_report
+
+    def _get_parameter_service_response(self, future):
+        """Wait for a parameter service response up to the configured timeout."""
+        timeout_sec = self.config.default_service_future_timeout_sec
+        deadline = time.monotonic() + timeout_sec
+
+        while not future.done():
+            remaining_sec = deadline - time.monotonic()
+            if remaining_sec <= 0.0:
+                return None
+            rclpy.spin_once(self.node, timeout_sec=min(0.1, remaining_sec))
+
+        return future.result()
+
+    def collect_node_parameters(self):
+        """Collect parameter values from every node in the benchmark namespace."""
+        node_parameters = {}
+        node_parameter_errors = {}
+
+        try:
+            benchmark_namespace = self.node.get_namespace().rstrip('/') or '/'
+            namespace_prefix = benchmark_namespace
+            if namespace_prefix != '/':
+                namespace_prefix += '/'
+
+            node_names = set()
+            for node_name, node_namespace in self.node.get_node_names_and_namespaces():
+                node_namespace = node_namespace.rstrip('/') or '/'
+                is_in_benchmark_namespace = benchmark_namespace == '/' or \
+                    node_namespace == benchmark_namespace or \
+                    node_namespace.startswith(namespace_prefix)
+                if not is_in_benchmark_namespace:
+                    continue
+
+                fully_qualified_name = \
+                    f'/{node_name}' if node_namespace == '/' else \
+                    f'{node_namespace}/{node_name}'
+                node_names.add(fully_qualified_name)
+        except Exception as error:
+            error_message = str(error) or type(error).__name__
+            node_parameter_errors['node_discovery'] = error_message
+            self.get_logger().warning(
+                f'Failed to discover nodes for parameter collection: {error_message}')
+            return node_parameters, node_parameter_errors
+
+        for node_name in sorted(node_names):
+            try:
+                parameter_client = AsyncParameterClient(self.node, node_name)
+                if not parameter_client.wait_for_services(
+                        timeout_sec=self.config.default_service_future_timeout_sec):
+                    raise TimeoutError('Parameter services are unavailable')
+
+                list_response = self._get_parameter_service_response(
+                    parameter_client.list_parameters())
+                if list_response is None:
+                    raise TimeoutError('Timed out while listing parameters')
+
+                parameter_names = sorted(list_response.result.names)
+                parameter_values = {}
+                if parameter_names:
+                    get_response = self._get_parameter_service_response(
+                        parameter_client.get_parameters(parameter_names))
+                    if get_response is None:
+                        raise TimeoutError('Timed out while getting parameter values')
+                    if len(get_response.values) != len(parameter_names):
+                        raise RuntimeError(
+                            'The parameter service returned an unexpected number of values')
+                    for name, value in zip(parameter_names, get_response.values):
+                        python_value = parameter_value_to_python(value)
+                        if isinstance(python_value, list):
+                            python_value = [
+                                item[0] if isinstance(item, bytes) and len(item) == 1
+                                else item
+                                for item in python_value
+                            ]
+                        parameter_values[name] = python_value
+
+                node_parameters[node_name] = {'ros__parameters': parameter_values}
+            except Exception as error:
+                error_message = str(error) or type(error).__name__
+                node_parameter_errors[node_name] = error_message
+                self.get_logger().warning(
+                    f'Failed to collect parameters from {node_name}: {error_message}')
+
+        return node_parameters, node_parameter_errors
 
     def export_report(self, report: dict) -> None:
         """Export the given report to a JSON file."""
@@ -706,6 +806,9 @@ class ROS2BenchmarkTest(unittest.TestCase):
             self.get_logger().info('Resource profiling started.')
 
         playback_start_timestamps = {}
+        # Whether the playback node reached the requested rate. Stays true when
+        # play_messages is false, which drives no playback node.
+        self._playback_rate_met = True
         if play_messages:
             # Start playing messages
             self.get_logger().info(
@@ -725,6 +828,11 @@ class ROS2BenchmarkTest(unittest.TestCase):
                 play_messages_future,
                 check_success=True,
                 timeout_sec=self.config.play_messages_service_future_timeout_sec)
+            self._playback_rate_met = play_messages_response.publisher_rate_met
+            if not self._playback_rate_met:
+                self.get_logger().warning(
+                    f'Playback node could not sustain the requested {target_freq} Hz, so the '
+                    'pipeline was never driven at that rate.')
 
             for i in range(len(play_messages_response.timestamps.keys)):
                 key = play_messages_response.timestamps.keys[i]
@@ -788,10 +896,11 @@ class ROS2BenchmarkTest(unittest.TestCase):
                     else:
                         out_of_order_start_timestamp_count += 1
             if out_of_order_start_timestamp_count > 0:
-                self.get_logger().warn(f'{out_of_order_start_timestamp_count}/'
-                                       f'{len(monitor_response.end_timestamps.keys)} '
-                                       'out of order start timestamps were detected in '
-                                       f'monitor {monitor_info.service_name}.')
+                self.get_logger().warning(
+                    f'{out_of_order_start_timestamp_count}/'
+                    f'{len(monitor_response.end_timestamps.keys)} '
+                    'out of order start timestamps were detected in '
+                    f'monitor {monitor_info.service_name}.')
             if self.config.collect_start_timestamps_from_monitors:
                 monitor_start_timestamps_map[monitor_info.service_name] = \
                     start_timestamps_from_monitor
@@ -912,9 +1021,14 @@ class ROS2BenchmarkTest(unittest.TestCase):
                 sub_heading=f'Throughput Search Probe {probe_freq}Hz')
 
             # Check if this probe frequency was sustainable
+            # The frame rate checks below compare the monitor against the rate the
+            # playback node achieved, not the rate requested. A probe the playback node
+            # could not drive at probe_freq is therefore not sustainable, regardless of
+            # what those checks report.
             first_monitor_perf = self.get_performance_results_of_first_monitor_calculator(
                 probe_perf_results)
-            if (first_monitor_perf.get(BasicPerformanceMetrics.MEAN_FRAME_RATE, 0) >=
+            if self._playback_rate_met and (
+                first_monitor_perf.get(BasicPerformanceMetrics.MEAN_FRAME_RATE, 0) >=
                 first_monitor_perf[BasicPerformanceMetrics.MEAN_PLAYBACK_FRAME_RATE] -
                 self.config.binary_search_acceptable_frame_rate_drop
                 ) and (
@@ -950,9 +1064,12 @@ class ROS2BenchmarkTest(unittest.TestCase):
                 sub_heading=f'Throughput Search Probe {probe_freq}Hz')
 
             # Check if this probe frequency was sustainable
+            # As in the binary search above, a probe the playback node could not drive
+            # at probe_freq is not sustainable, regardless of what the monitor reports.
             first_monitor_perf = self.get_performance_results_of_first_monitor_calculator(
                 probe_perf_results)
-            if (first_monitor_perf[BasicPerformanceMetrics.MEAN_FRAME_RATE] >=
+            if self._playback_rate_met and (
+                first_monitor_perf[BasicPerformanceMetrics.MEAN_FRAME_RATE] >=
                 first_monitor_perf[BasicPerformanceMetrics.MEAN_PLAYBACK_FRAME_RATE] -
                 self.config.linear_scan_acceptable_frame_rate_drop
                 ) and (
@@ -971,16 +1088,16 @@ class ROS2BenchmarkTest(unittest.TestCase):
         # Check if target frequency is at either lower or higher bound of range
         BOUNDARY_LIMIT_EPSILON = 5  # (Hz)
         if target_freq >= self.config.publisher_upper_frequency - BOUNDARY_LIMIT_EPSILON:
-            self.get_logger().warn(
+            self.get_logger().warning(
                 f'Final playback framerate {target_freq} Hz is close to or above max framerate '
                 f'{self.config.publisher_upper_frequency} Hz used in search window. ')
-            self.get_logger().warn(
+            self.get_logger().warning(
                 'Consider increasing this maximum!')
         elif target_freq <= self.config.publisher_lower_frequency + BOUNDARY_LIMIT_EPSILON:
-            self.get_logger().warn(
+            self.get_logger().warning(
                 f'Final playback framerate {target_freq} Hz is close to or below min framerate '
                 f'{self.config.publisher_lower_frequency} Hz used in search window. ')
-            self.get_logger().warn(
+            self.get_logger().warning(
                 'Consider decreasing this minimum!')
 
         self.pop_logger_name()
@@ -1026,6 +1143,13 @@ class ROS2BenchmarkTest(unittest.TestCase):
             elif (self.config.benchmark_mode == BenchmarkMode.LOOPING) or \
                  (self.config.benchmark_mode == BenchmarkMode.SWEEPING):
                 perf_results = self.run_benchmark_looping_mode()
+
+        if self.config.collect_node_parameters:
+            self.get_logger().info('Collecting node parameters')
+            self._node_parameters, self._node_parameter_errors = \
+                self.collect_node_parameters()
+            self.get_logger().info(
+                f'Collected parameters from {len(self._node_parameters)} nodes')
 
         final_report = self.construct_final_report(perf_results)
         self.print_report(final_report, sub_heading='Final Report')

@@ -270,6 +270,10 @@ If desired, additional fixed playback rates can be specified to calculate additi
 
 Finally, the metadata provided at the end of the JSON file contains system and file information to provide a transparent and reproducible record of how the benchmark results were obtained. `BenchmarkMetadata.CONFIG` contains a copy of the configuration file YAML as a string. This configuration can be used to run a benchmark with identical parameters to those from the results file.
 
+When enabled, `BenchmarkMetadata.NODE_PARAMETERS` contains the final parameter values from every node in the benchmark namespace. Fully qualified node names are used as keys, and each node uses the standard ROS `ros__parameters` structure.
+
+Node parameter collection is disabled by default and can be enabled with `collect_node_parameters: true`. Collection failures do not discard benchmark measurements; they produce a warning and are recorded in `BenchmarkMetadata.NODE_PARAMETER_ERRORS`.
+
 The name and checksum of the dataset used for the benchmark are also provided, ensuring that the same dataset has been used when comparing or reproducing independent results.
 
 ```json
@@ -285,6 +289,13 @@ The name and checksum of the dataset used for the benchmark are also provided, e
     "BenchmarkMetadata.PEAK_THROUGHPUT_PREDICTION": 10.0,
     "BenchmarkMetadata.INPUT_DATA_PATH": "assets/r2b_storage/r2b_storage.db3",
     "BenchmarkMetadata.INPUT_DATA_HASH": "b7e276d5105397dfb19a6f2c6db7672f",
+    "BenchmarkMetadata.NODE_PARAMETERS": {
+      "/r2b/AprilTagNode": {
+        "ros__parameters": {
+          "max_hamming": 0
+        }
+      }
+    },
     "BenchmarkMetadata.CONFIG": [copy of input config as stringified YAML]
   }
 }

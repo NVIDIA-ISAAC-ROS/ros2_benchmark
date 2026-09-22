@@ -48,7 +48,7 @@ PlaybackNode::PlaybackNode(
         &PlaybackNode::StartRecordingServiceCallback,
         this, std::placeholders::_1,
         std::placeholders::_2),
-      rmw_qos_profile_default,
+      rclcpp::ServicesQoS(),
       service_callback_group_)},
   stop_recording_service_{
     create_service<ros2_benchmark_interfaces::srv::StopRecording>(
@@ -57,7 +57,7 @@ PlaybackNode::PlaybackNode(
         &PlaybackNode::StopRecordingServiceCallback,
         this, std::placeholders::_1,
         std::placeholders::_2),
-      rmw_qos_profile_default,
+      rclcpp::ServicesQoS(),
       service_callback_group_)},
   play_messages_service_{
     create_service<ros2_benchmark_interfaces::srv::PlayMessages>(
@@ -66,7 +66,7 @@ PlaybackNode::PlaybackNode(
         &PlaybackNode::PlayMessagesServiceCallback,
         this, std::placeholders::_1,
         std::placeholders::_2),
-      rmw_qos_profile_default,
+      rclcpp::ServicesQoS(),
       service_callback_group_)},
   max_size_(std::numeric_limits<size_t>::max()),
   data_formats_(declare_parameter<std::vector<std::string>>(
@@ -537,6 +537,7 @@ void PlaybackNode::PlayMessagesLoopingSweeping(
 
   // Finally, mark success as true
   response->success = true;
+  response->publisher_rate_met = is_publisher_rate_met;
   response->timestamps = timestamps;
 
   start_timestamps_.clear();
