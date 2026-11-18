@@ -88,7 +88,11 @@ ros2_benchmark_config:
     start_recording_service_future_timeout_sec: 35
     play_messages_service_future_timeout_sec: 30
 
-   # Amount of time to wait before and after trial run before starting test iterations
+    # Duration of the trial run for warmup running at publisher_lower_frequency rate
+    # Set to 0.0 to disable trial run
+    trial_run_duration_sec: 15.0
+
+    # Amount of time to wait before and after trial run before starting test iterations
     pre_trial_run_wait_time_sec: 0.0
     post_trial_run_wait_time_sec: 0.0
 
@@ -109,8 +113,23 @@ ros2_benchmark_config:
     # Whether to stop testing when the desired playback publisher rate cannot be met
     enforce_publisher_rate: false
 
+    # Maximum relative shortfall in measured average offered rate during peak search.
+    # Individual playback deadline misses remain diagnostics unless enforcement is on.
+    publisher_rate_tolerance_fraction: 0.01
+
     # A list of fixed test publisher rate to be tested after the main fps benchmark test
     additional_fixed_publisher_rate_tests: [10.0, 30.0, 60.0]
+
+    # Number of independent low-rate latency probe iterations
+    # Set to 0 to disable latency probe
+    latency_probe_iterations: 5
+
+    # Duration of each low-rate latency probe iteration
+    latency_probe_duration_sec: 5.0
+
+    # Scale applied to inverse latency to set the conservative lower search bound;
+    # the unscaled inverse-latency estimate is used as the initial upper bound
+    latency_probe_candidate_rate_factor: 0.8
 
     # Stop binary search once upper and lower target frequencies are within this range
     binary_search_terminal_interval_width: 10  # (hz)

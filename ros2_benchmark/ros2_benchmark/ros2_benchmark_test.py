@@ -20,7 +20,8 @@ from enum import Enum
 from functools import partial
 import hashlib
 import json
-from math import ceil
+from math import ceil, isfinite
+from numbers import Real
 import os
 import platform
 import sys
@@ -57,6 +58,10 @@ idle_cpu_util = None
 idle_gpu_util = None
 
 
+class NoMonitorOutputError(RuntimeError):
+    """Raised when a required benchmark monitor observes no output."""
+
+
 def _get_resource_profiler():
     """Select the appropriate resource profiler based on platform."""
     if nvidia_smi_available:
@@ -89,6 +94,44 @@ class BenchmarkMetadata(Enum):
     CONFIG = 'Test Configurations'
     NODE_PARAMETERS = 'Node Parameters'
     NODE_PARAMETER_ERRORS = 'Node Parameter Collection Errors'
+
+
+def _achieved_publisher_rate(message_keys, timestamps_ns):
+    """Return the offered interval rate, or None for insufficient/invalid evidence."""
+    if len(message_keys) != len(timestamps_ns) or len(message_keys) < 2:
+        return None
+    if len(set(message_keys)) != len(message_keys):
+        return None
+    # Playback records one sample per published group, keyed by increasing sequence ID.
+    # Order by that ID, never by wall time: clock jumps must remain detectable.
+    timestamps_ns = [stamp for _, stamp in sorted(zip(message_keys, timestamps_ns))]
+    if any(not isfinite(stamp) for stamp in timestamps_ns):
+        return None
+    if any(later <= earlier for earlier, later in
+           zip(timestamps_ns, timestamps_ns[1:])):
+        return None
+    return (len(timestamps_ns) - 1) * 1e9 / (timestamps_ns[-1] - timestamps_ns[0])
+
+
+def _publisher_rate_is_sufficient(achieved_rate, target_rate, tolerance_fraction):
+    """Check average offered rate without treating isolated deadline misses as starvation."""
+    if not isfinite(tolerance_fraction) or not 0 <= tolerance_fraction < 1:
+        raise ValueError('publisher_rate_tolerance_fraction must be finite and in [0, 1)')
+    if not isfinite(target_rate) or target_rate <= 0:
+        return False
+    return (achieved_rate is not None and isfinite(achieved_rate) and
+            achieved_rate >= target_rate * (1 - tolerance_fraction))
+
+
+def _frame_loss_is_acceptable(performance_results, tolerance_fraction):
+    """Require valid counts within the configured fraction, without rounding up."""
+    if not isfinite(tolerance_fraction) or not 0 <= tolerance_fraction <= 1:
+        raise ValueError('acceptable_frame_loss_fraction must be finite and in [0, 1]')
+    sent = performance_results.get(BasicPerformanceMetrics.NUM_FRAMES_SENT)
+    missed = performance_results.get(BasicPerformanceMetrics.NUM_MISSED_FRAMES)
+    if not all(isinstance(value, Real) and isfinite(value) for value in (sent, missed)):
+        return False
+    return sent > 0 and 0 <= missed <= sent and missed / sent <= tolerance_fraction
 
 
 class ROS2BenchmarkTest(unittest.TestCase):
@@ -746,7 +789,8 @@ class ROS2BenchmarkTest(unittest.TestCase):
     def benchmark_body(self,
                        playback_message_count=0,
                        target_freq=0,
-                       play_messages=True) -> dict:
+                       play_messages=True,
+                       calculate_performance=True) -> dict:
         """
         Run benchmark test.
 
@@ -758,7 +802,8 @@ class ROS2BenchmarkTest(unittest.TestCase):
             Target test publisher rate
         play_messages :
             Enable publishing benchmark messages from a playback node
-
+        calculate_performance :
+            Calculate performance results; disable for discarded trial runs
         Returns
         -------
         dict
@@ -828,11 +873,24 @@ class ROS2BenchmarkTest(unittest.TestCase):
                 play_messages_future,
                 check_success=True,
                 timeout_sec=self.config.play_messages_service_future_timeout_sec)
-            self._playback_rate_met = play_messages_response.publisher_rate_met
-            if not self._playback_rate_met:
-                self.get_logger().warning(
-                    f'Playback node could not sustain the requested {target_freq} Hz, so the '
-                    'pipeline was never driven at that rate.')
+            if self.config.benchmark_mode in (BenchmarkMode.LOOPING, BenchmarkMode.SWEEPING):
+                achieved_rate = _achieved_publisher_rate(
+                    play_messages_response.timestamps.keys,
+                    play_messages_response.timestamps.timestamps_ns)
+                self._playback_rate_met = _publisher_rate_is_sufficient(
+                    achieved_rate, target_freq, self.config.publisher_rate_tolerance_fraction)
+                if not play_messages_response.publisher_rate_met:
+                    self.get_logger().warning(
+                        'Playback missed one or more individual deadlines; '
+                        'checking the average offered rate.')
+                self.get_logger().info(
+                    f'Offered playback rate: {achieved_rate} Hz; target: {target_freq} Hz; '
+                    f'tolerance fraction: {self.config.publisher_rate_tolerance_fraction}; '
+                    f'accepted: {self._playback_rate_met}')
+                if not self._playback_rate_met:
+                    self.get_logger().warning(
+                        'Playback did not demonstrate the requested average rate '
+                        'within the configured tolerance.')
 
             for i in range(len(play_messages_response.timestamps.keys)):
                 key = play_messages_response.timestamps.keys[i]
@@ -931,16 +989,25 @@ class ROS2BenchmarkTest(unittest.TestCase):
         if self.config.export_monitor_raw_data:
             self.add_monitor_raw_data_list(monitor_raw_data_list)
 
-        # Calculate performance results
-        performance_results = {}
+        # A cold graph may produce no trial-run output. Playback and monitor service
+        # failures must still propagate so measurements cannot reuse an active trial.
+        if not calculate_performance:
+            return {}
+
+        # Validate all required monitors before updating any performance calculator.
         for monitor_info in self.config.monitor_info_list:
-            start_timestamps = monitor_start_timestamps_map[monitor_info.service_name]
             end_timestamps = monitor_end_timestamps_map[monitor_info.service_name]
             if len(end_timestamps) == 0:
                 error_message = 'No messages were observed from the monitor node ' + \
                     monitor_info.service_name
                 self.get_logger().error(error_message)
-                raise RuntimeError(error_message)
+                raise NoMonitorOutputError(error_message)
+
+        # Calculate performance results
+        performance_results = {}
+        for monitor_info in self.config.monitor_info_list:
+            start_timestamps = monitor_start_timestamps_map[monitor_info.service_name]
+            end_timestamps = monitor_end_timestamps_map[monitor_info.service_name]
             for calculator in monitor_info.calculators:
                 performance_results.update(
                     calculator.calculate_performance(start_timestamps, end_timestamps))
@@ -953,7 +1020,7 @@ class ROS2BenchmarkTest(unittest.TestCase):
 
     def determine_max_sustainable_framerate(self, test_func) -> float:
         """
-        Find the maximum sustainable test pulbisher framerate by using autotuner.
+        Find the maximum sustainable test publisher framerate by using autotuner.
 
         Parameters
         ----------
@@ -963,9 +1030,13 @@ class ROS2BenchmarkTest(unittest.TestCase):
         Returns
         -------
         float
-            The maximum sustainable test pulbisher framerate
+            The maximum sustainable test publisher framerate
 
         """
+        step = self.config.linear_scan_step_size
+        if not isfinite(step) or step <= 0:
+            self.fail('linear_scan_step_size must be finite and greater than 0.')
+
         self.push_logger_name('Probing')
 
         # Phase 1: Binary Search to identify interval
@@ -973,33 +1044,123 @@ class ROS2BenchmarkTest(unittest.TestCase):
         current_upper_freq = self.config.publisher_upper_frequency
         current_lower_freq = self.config.publisher_lower_frequency
 
-        # Run a trial run to warm up the graph
-        if self.config.pre_trial_run_wait_time_sec > 0.0:
-            print('Wait {} seconds before starting the trial run'.format(
-                self.config.pre_trial_run_wait_time_sec))
-            time.sleep(self.config.pre_trial_run_wait_time_sec)
-        try:
-            probe_freq = (current_upper_freq + current_lower_freq) / 2
-            message_count = ceil(
-                self.config.benchmark_duration *
-                self.config.binary_search_duration_fraction *
-                probe_freq)
-            self.get_logger().info(f'Starting the trial probe at {probe_freq} Hz')
-            probe_perf_results = test_func(message_count, probe_freq)
-            self.print_report(
-                probe_perf_results,
-                sub_heading=f'Trial Probe {probe_freq}Hz')
-        except Exception:
-            self.get_logger().info(
-                f'Ignoring an exception occured in the trial probe at {probe_freq} Hz')
-        finally:
-            self.get_logger().info(
-                f'Finished the first trial probe at {probe_freq} Hz')
+        # Replace the legacy midpoint trial with a safe low-rate trial run. The optional
+        # latency sample can then provide an inferred starting window for the existing search.
+        if self.config.trial_run_duration_sec < 0.0:
+            raise ValueError('trial_run_duration_sec must not be negative')
+        if self.config.latency_probe_iterations < 0:
+            raise ValueError('latency_probe_iterations must not be negative')
+        if self.config.latency_probe_iterations > 0:
+            if (
+                not isfinite(self.config.latency_probe_duration_sec) or
+                self.config.latency_probe_duration_sec <= 0.0
+            ):
+                raise ValueError(
+                    'latency_probe_duration_sec must be finite and greater than 0')
+            if not 0.0 < self.config.latency_probe_candidate_rate_factor < 1.0:
+                raise ValueError('latency_probe_candidate_rate_factor must be in (0, 1)')
 
-        if self.config.post_trial_run_wait_time_sec > 0.0:
-            print('Wait {} seconds before starting the main benchmarks'.format(
-                self.config.post_trial_run_wait_time_sec))
-            time.sleep(self.config.post_trial_run_wait_time_sec)
+        if self.config.trial_run_duration_sec > 0.0:
+            if self.config.pre_trial_run_wait_time_sec > 0.0:
+                print('Wait {} seconds before starting the trial run'.format(
+                    self.config.pre_trial_run_wait_time_sec))
+                time.sleep(self.config.pre_trial_run_wait_time_sec)
+
+            trial_run_message_count = ceil(
+                self.config.trial_run_duration_sec *
+                self.config.publisher_lower_frequency)
+            self.get_logger().info(
+                'Running the graph trial at '
+                f'{self.config.publisher_lower_frequency} Hz for '
+                f'{self.config.trial_run_duration_sec} seconds; '
+                'trial-run results will be discarded')
+            test_func(
+                trial_run_message_count,
+                self.config.publisher_lower_frequency,
+                calculate_performance=False)
+
+            if self.config.post_trial_run_wait_time_sec > 0.0:
+                print('Wait {} seconds before starting the main benchmarks'.format(
+                    self.config.post_trial_run_wait_time_sec))
+                time.sleep(self.config.post_trial_run_wait_time_sec)
+
+        if self.config.latency_probe_iterations > 0:
+            try:
+                latency_samples_ms = []
+                latency_probe_playback_message_count = max(
+                    1,
+                    ceil(
+                        self.config.latency_probe_duration_sec *
+                        self.config.publisher_lower_frequency))
+                for iteration_index in range(self.config.latency_probe_iterations):
+                    self.get_logger().info(
+                        'Measuring end-to-end latency at '
+                        f'{self.config.publisher_lower_frequency} Hz for '
+                        f'{self.config.latency_probe_duration_sec} seconds with '
+                        f'{latency_probe_playback_message_count} message set(s) '
+                        f'({iteration_index + 1}/'
+                        f'{self.config.latency_probe_iterations})')
+                    try:
+                        probe_perf_results = test_func(
+                            latency_probe_playback_message_count,
+                            self.config.publisher_lower_frequency)
+                    except NoMonitorOutputError as error:
+                        self.get_logger().warning(
+                            f'Discarding latency probe iteration {iteration_index + 1}/'
+                            f'{self.config.latency_probe_iterations}: {error}')
+                        continue
+                    self.print_report(
+                        probe_perf_results,
+                        sub_heading=(
+                            f'Latency Probe {iteration_index + 1}/'
+                            f'{self.config.latency_probe_iterations}'))
+                    monitor_performance_results = (
+                        self.get_performance_results_of_monitor_calculators(
+                            probe_perf_results))
+                    for _, monitor_perf in monitor_performance_results:
+                        sample_latency_ms = monitor_perf.get(
+                            BasicPerformanceMetrics.FIRST_SENT_RECEIVED_LATENCY)
+                        if (
+                            isinstance(sample_latency_ms, Real) and
+                            isfinite(sample_latency_ms) and
+                            sample_latency_ms > 0.0
+                        ):
+                            latency_samples_ms.append(sample_latency_ms)
+
+                if not latency_samples_ms:
+                    raise RuntimeError('No monitor latency results were produced')
+
+                latency_ms = max(latency_samples_ms)
+
+                candidate_peak_rate = 1000.0 / latency_ms
+                if (
+                    self.config.publisher_lower_frequency <
+                    candidate_peak_rate <
+                    self.config.publisher_upper_frequency
+                ):
+                    current_lower_freq = max(
+                        self.config.publisher_lower_frequency,
+                        candidate_peak_rate *
+                        self.config.latency_probe_candidate_rate_factor)
+                    current_upper_freq = candidate_peak_rate
+
+                    self.get_logger().info(
+                        f'Measured {latency_ms:.3f} ms maximum observed '
+                        'end-to-end latency; starting the existing throughput search '
+                        f'in inferred bracket [{current_lower_freq:.3f}, '
+                        f'{current_upper_freq:.3f}] Hz')
+                else:
+                    self.get_logger().info(
+                        f'Latency candidate {candidate_peak_rate:.3f} Hz does not '
+                        'narrow the configured search window; retaining '
+                        f'[{current_lower_freq}, {current_upper_freq}] Hz')
+            except Exception as error:
+                current_lower_freq = self.config.publisher_lower_frequency
+                current_upper_freq = self.config.publisher_upper_frequency
+                self.get_logger().warning(
+                    'Could not derive a starting window from the latency probe '
+                    f'({error}); falling back to the configured search window '
+                    f'[{current_lower_freq}, {current_upper_freq}] Hz')
 
         # Continue binary search until the search window is small enough to justify a linear scan
         while (
@@ -1031,24 +1192,19 @@ class ROS2BenchmarkTest(unittest.TestCase):
                 first_monitor_perf.get(BasicPerformanceMetrics.MEAN_FRAME_RATE, 0) >=
                 first_monitor_perf[BasicPerformanceMetrics.MEAN_PLAYBACK_FRAME_RATE] -
                 self.config.binary_search_acceptable_frame_rate_drop
-                ) and (
-                    first_monitor_perf[BasicPerformanceMetrics.NUM_MISSED_FRAMES] <=
-                    ceil(first_monitor_perf[BasicPerformanceMetrics.NUM_FRAMES_SENT] *
-                         self.config.binary_search_acceptable_frame_loss_fraction)
+                ) and _frame_loss_is_acceptable(
+                    first_monitor_perf,
+                    self.config.binary_search_acceptable_frame_loss_fraction
             ):
                 current_lower_freq = probe_freq
             else:
                 current_upper_freq = probe_freq
 
-        target_freq = current_lower_freq
-
-        # Phase 2: Linear scan through interval from low to high
-
-        # Increase probe frequency, until failures occur or ceiling is reached
-        while True:
-            probe_freq = target_freq + self.config.linear_scan_step_size
-            if probe_freq > self.config.publisher_upper_frequency:
-                break
+        # Phase 2: Validate the binary seed with the linear criteria before scanning up.
+        # A binary-accepted rate may not meet the stricter linear tolerances.
+        target_freq = None
+        probe_freq = current_lower_freq
+        while probe_freq <= self.config.publisher_upper_frequency:
 
             self.get_logger().info(
                 f'Linear Scan: Probing for max sustainable frequency at {probe_freq} Hz')
@@ -1072,15 +1228,26 @@ class ROS2BenchmarkTest(unittest.TestCase):
                 first_monitor_perf[BasicPerformanceMetrics.MEAN_FRAME_RATE] >=
                 first_monitor_perf[BasicPerformanceMetrics.MEAN_PLAYBACK_FRAME_RATE] -
                 self.config.linear_scan_acceptable_frame_rate_drop
-                ) and (
-                first_monitor_perf[BasicPerformanceMetrics.NUM_MISSED_FRAMES] <=
-                ceil(first_monitor_perf[BasicPerformanceMetrics.NUM_FRAMES_SENT] *
-                     self.config.linear_scan_acceptable_frame_loss_fraction)
+                ) and _frame_loss_is_acceptable(
+                    first_monitor_perf,
+                    self.config.linear_scan_acceptable_frame_loss_fraction
             ):
                 target_freq = probe_freq
-            else:
-                # The new probe frequency is too high, so terminate the linear scan
+                if probe_freq < current_lower_freq:
+                    # The next higher rate already failed while backing off the seed.
+                    break
+                probe_freq += self.config.linear_scan_step_size
+            elif target_freq is not None:
+                # Preserve the last rate that passed the linear criteria.
                 break
+            elif probe_freq <= self.config.publisher_lower_frequency:
+                self.fail(
+                    'No sustainable frequency found within the configured range: '
+                    f'the minimum {probe_freq} Hz failed the linear scan criteria.')
+            else:
+                probe_freq = max(
+                    self.config.publisher_lower_frequency,
+                    probe_freq - self.config.linear_scan_step_size)
 
         self.get_logger().info(
             f'Final predicted max sustainable frequency was {target_freq}Hz')
@@ -1237,6 +1404,22 @@ class ROS2BenchmarkTest(unittest.TestCase):
                                    f'{str(self.config.publisher_upper_frequency)} Hz')
             target_freq = self.config.publisher_upper_frequency
             self._peak_throughput_prediction = None
+
+            # Warm up the graph before collecting fixed-rate measurements.
+            if self.config.pre_trial_run_wait_time_sec > 0.0:
+                time.sleep(self.config.pre_trial_run_wait_time_sec)
+            self.get_logger().debug(f'Starting the trial run at {target_freq} Hz')
+            try:
+                self.benchmark_body(
+                    int(self.config.benchmark_duration * target_freq), target_freq,
+                    calculate_performance=False)
+            except BaseException:
+                # No measured iterations will run after an interrupted trial run.
+                self.pop_logger_name()
+                raise
+            finally:
+                if self.config.post_trial_run_wait_time_sec > 0.0:
+                    time.sleep(self.config.post_trial_run_wait_time_sec)
         else:
             # Run Autotuner
             self.get_logger().info('Running autotuner')
@@ -1257,6 +1440,22 @@ class ROS2BenchmarkTest(unittest.TestCase):
                 playback_message_count,
                 target_freq)
             self.print_report(performance_results, sub_heading=f'{target_freq}Hz #{i+1}')
+
+            # A search pass does not validate the subsequent measured iterations.
+            # Check before aggregation can hide an outlier and before exporting a
+            # successful report. Explicit fixed-rate tests may intentionally overload.
+            if self._peak_throughput_prediction is not None:
+                monitor_perf = self.get_performance_results_of_first_monitor_calculator(
+                    performance_results)
+                tolerance = self.config.linear_scan_acceptable_frame_loss_fraction
+                self.assertTrue(
+                    _frame_loss_is_acceptable(monitor_perf, tolerance),
+                    f'Peak-throughput iteration {i+1} at {target_freq} Hz has invalid '
+                    'frame counts or exceeds the configured frame-loss tolerance '
+                    f'{tolerance}: missed='
+                    f'{monitor_perf.get(BasicPerformanceMetrics.NUM_MISSED_FRAMES)}, sent='
+                    f'{monitor_perf.get(BasicPerformanceMetrics.NUM_FRAMES_SENT)}. '
+                    'No final report will be exported.')
 
         # Conclude performance measurements from the iteratoins
         final_perf_results = {}
@@ -1305,6 +1504,30 @@ class ROS2BenchmarkTest(unittest.TestCase):
         if 'report_prefix' in calculator.config and calculator.config['report_prefix']:
             return performance_results[calculator.config['report_prefix']]
         return performance_results
+
+    def get_performance_results_of_monitor_calculators(self, performance_results):
+        """Get one available latency-capable calculator result from each monitor."""
+        monitor_performance_results = []
+        multiple_monitors = len(self.config.monitor_info_list) > 1
+        used_report_prefixes = set()
+        for monitor_info in self.config.monitor_info_list:
+            for calculator in monitor_info.calculators:
+                report_prefix = calculator.config.get('report_prefix', '')
+                if report_prefix and report_prefix not in used_report_prefixes:
+                    calculator_results = performance_results.get(report_prefix)
+                elif multiple_monitors:
+                    calculator_results = None
+                else:
+                    calculator_results = performance_results
+                if (
+                    isinstance(calculator_results, dict) and
+                    BasicPerformanceMetrics.FIRST_SENT_RECEIVED_LATENCY in calculator_results
+                ):
+                    monitor_performance_results.append(
+                        (monitor_info.service_name, calculator_results))
+                    used_report_prefixes.add(report_prefix)
+                    break
+        return monitor_performance_results
 
     def reset_performance_calculators(self):
         """Reset the states of all performance calculators associated with all monitors."""

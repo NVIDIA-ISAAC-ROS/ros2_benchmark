@@ -88,14 +88,9 @@ class BasicPerformanceCalculator():
         received_duration_ms = last_end_timestamp_ms - first_end_timestamp_ms
         perf_data[BasicPerformanceMetrics.RECEIVED_DURATION] = received_duration_ms
 
-        # BasicPerformanceMetrics.MEAN_PLAYBACK_FRAME_RATE
-        if (len(start_timestamps_ns) > 1):
+        if len(start_timestamps_ns) > 0:
             last_sent_time_ms = list(start_timestamps_ns.values())[-1] / 10**6
             first_sent_time_ms = list(start_timestamps_ns.values())[0] / 10**6
-            sent_duration_ms = last_sent_time_ms - first_sent_time_ms
-            perf_data[BasicPerformanceMetrics.MEAN_PLAYBACK_FRAME_RATE] = len(
-                start_timestamps_ns) / (sent_duration_ms / 1000.0)
-
             perf_data[BasicPerformanceMetrics.FIRST_SENT_RECEIVED_LATENCY] = \
                 first_end_timestamp_ms - first_sent_time_ms
             perf_data[BasicPerformanceMetrics.LAST_SENT_RECEIVED_LATENCY] = \
@@ -104,6 +99,12 @@ class BasicPerformanceCalculator():
             perf_data[BasicPerformanceMetrics.NUM_MISSED_FRAMES] = \
                 len(start_timestamps_ns) - len(end_timestamps_ns)
             perf_data[BasicPerformanceMetrics.NUM_FRAMES_SENT] = len(start_timestamps_ns)
+
+        # BasicPerformanceMetrics.MEAN_PLAYBACK_FRAME_RATE
+        if len(start_timestamps_ns) > 1:
+            sent_duration_ms = last_sent_time_ms - first_sent_time_ms
+            perf_data[BasicPerformanceMetrics.MEAN_PLAYBACK_FRAME_RATE] = len(
+                start_timestamps_ns) / (sent_duration_ms / 1000.0)
 
         # BasicPerformanceMetrics.MEAN_FRAME_RATE
         if received_duration_ms > 0:

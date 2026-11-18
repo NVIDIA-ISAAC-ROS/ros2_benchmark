@@ -93,6 +93,12 @@ if(BUILD_TESTING)
     cmake_policy(SET CMP0148 OLD)
   endif()
 
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(publisher_rate_test test/test_publisher_rate.py)
+  ament_add_pytest_test(peak_search_test test/test_peak_search.py)
+  ament_add_pytest_test(service_deadline_test test/test_service_deadline.py TIMEOUT 30)
+  ament_add_pytest_test(final_frame_loss_test test/test_final_frame_loss.py)
+
   find_package(launch_testing_ament_cmake REQUIRED)
   add_launch_test(test/data_loader_node_pol.py TIMEOUT "60")
   add_launch_test(test/monitor_node_pol.py TIMEOUT "60")
