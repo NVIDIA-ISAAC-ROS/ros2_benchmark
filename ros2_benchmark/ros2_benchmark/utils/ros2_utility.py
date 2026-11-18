@@ -40,11 +40,13 @@ class ClientUtility:
     @staticmethod
     def get_service_response_from_future_blocking(node, future, timeout_sec):
         """Block and wait for a service future to return."""
-        start_time = time.time()
+        deadline = time.monotonic() + timeout_sec
         while not future.done():
-            rclpy.spin_once(node)
-            if (time.time() - start_time) > timeout_sec:
+            remaining_sec = deadline - time.monotonic()
+            if remaining_sec <= 0.0:
                 node.get_logger().info(
                     f'Waiting for a service future timed out ({timeout_sec}s)')
                 return None
+            # A quiet executor must still wake to check the service deadline.
+            rclpy.spin_once(node, timeout_sec=remaining_sec)
         return future.result()
