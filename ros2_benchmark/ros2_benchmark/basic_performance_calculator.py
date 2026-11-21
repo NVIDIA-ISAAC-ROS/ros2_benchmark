@@ -198,8 +198,9 @@ class BasicPerformanceCalculator():
                 continue
 
             # Remove the best and the worst before concluding the metric
-            metric_value_list.remove(max(metric_value_list))
-            metric_value_list.remove(min(metric_value_list))
+            if len(metric_value_list) > 2:
+                metric_value_list.remove(max(metric_value_list))
+                metric_value_list.remove(min(metric_value_list))
 
             if metric in MEAN_METRICS:
                 final_perf_data[metric] = sum(metric_value_list)/len(metric_value_list)
